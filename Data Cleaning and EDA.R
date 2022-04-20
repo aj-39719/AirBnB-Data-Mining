@@ -81,5 +81,6 @@ hist(colMeans(is.na(airbnb)),
 # removes listings with no stays or corrupted/incomplete reviews
 airbnb = airbnb[!is.na(airbnb$review_scores_location) & !is.na(airbnb$review_scores_checkin) & !is.na(airbnb$review_scores_cleanliness) & !is.na(airbnb$review_scores_value),]
 
-
+# turns all NA join times into the mean join time
+airbnb$join_time[which(is.na(airbnb$join_time))] = mean(airbnb$join_time[which(!is.na(airbnb$join_time))])
 
