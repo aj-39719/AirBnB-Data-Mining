@@ -1,6 +1,7 @@
 # ***** Exploratory Data Analysis ******
 library('data.table')
 path = '/Users/admin/Downloads/listings.csv'
+#airbnb = fread(input = "listings.csv")
 airbnb = fread(input = path)
 
 # Check the structure of the table
