@@ -44,7 +44,7 @@ host_since =as.character(airbnb [["host_since"]])
 # Calculate the joining time for each host
 join_time = c()
 for(i in 1: length(host_since )){
-join_time[i] = difftime("2021-12-07", strptime(host_since[i], format = "%Y-%m-%d"), ,unit = "days")
+join_time[i] = difftime("2021-12-09", strptime(host_since[i], format = "%Y-%m-%d"), ,unit = "days")
 }
 # Introduce join_time as a new column into data set
 airbnb = cbind(airbnb,join_time)
