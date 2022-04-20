@@ -1,6 +1,7 @@
 # ***** Exploratory Data Analysis ******
 library('data.table')
-airbnb = fread(input = "listings.csv")
+path = '/Users/admin/Downloads/listings.csv'
+airbnb = fread(input = path)
 
 # Check the structure of the table
 str(airbnb)
@@ -40,4 +41,6 @@ more_cols_removed = c("id","listing_url","scrape_id","last_scraped","name","desc
 
 airbnb = subset(airbnb, select = !(names(airbnb) %in% more_cols_removed))
 
-
+even_more_cols_removed = c("host_listings_count","neighbourhood","bathrooms","minimum_minimum_nights","maximum_minimum_nights","minimum_maximum_nights","maximum_maximum_nights","minimum_nights_avg_ntm","maximum_nights_avg_ntm")
+airbnb = subset(airbnb, select = !(names(airbnb) %in% even_more_cols_removed))
+airbnb = airbnb[-which(airbnb$host_total_listings_count==0)]
