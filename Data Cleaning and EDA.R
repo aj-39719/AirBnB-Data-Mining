@@ -53,7 +53,7 @@ airbnb = cbind(airbnb,join_time)
 cols_to_be_removed = c("id","listing_url","scrape_id","last_scraped","name","description","neighborhood_overview",
                       "picture_url","host_id","host_url","host_name","host_since","host_about","host_thumbnail_url",
                       "host_picture_url","calendar_last_scraped", "first_review", "last_review", "bathrooms_text", 
-                      "host_listings_count","neighbourhood","bathrooms","minimum_minimum_nights",
+                      "host_listings_count","neighbourhood","minimum_minimum_nights",
                       "maximum_minimum_nights","minimum_maximum_nights","maximum_maximum_nights",
                       "minimum_nights_avg_ntm","maximum_nights_avg_ntm")
 
@@ -67,7 +67,7 @@ airbnb[airbnb=="N/A"] = NA
 airbnb[airbnb == "" | airbnb == " "] = NA 
 
 # We remove rows where total listings by a host = 0 
-airbnb = airbnb[-which(airbnb$host_total_listings_count==0)]
+#airbnb = airbnb[-which(airbnb$host_total_listings_count==0)]
 
 # Check NA values as a percentage of total data again 
 hist(colMeans(is.na(airbnb)),
@@ -77,6 +77,9 @@ hist(colMeans(is.na(airbnb)),
      xlab = "Mean NA Values",
      border = "white",
      ylim = c(0,65))
+
+# removes listings with no stays or corrupted/incomplete reviews
+airbnb = airbnb[!is.na(airbnb$review_scores_location) & !is.na(airbnb$review_scores_checkin) & !is.na(airbnb$review_scores_cleanliness) & !is.na(airbnb$review_scores_value),]
 
 
 
