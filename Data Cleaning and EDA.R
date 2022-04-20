@@ -66,9 +66,6 @@ airbnb[airbnb=="N/A"] = NA
 # We also have some blank values in some columns that should be converted to NA as well
 airbnb[airbnb == "" | airbnb == " "] = NA 
 
-# We remove rows where total listings by a host = 0 
-#airbnb = airbnb[-which(airbnb$host_total_listings_count==0)]
-
 # Check NA values as a percentage of total data again 
 hist(colMeans(is.na(airbnb)),
      labels = TRUE,
