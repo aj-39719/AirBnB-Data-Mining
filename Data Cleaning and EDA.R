@@ -39,6 +39,16 @@ airbnb = subset(airbnb, select = !(names(airbnb) %in% blank_cols))
 #Lets store number of bathrooms in the blank column, by extracting data from the bathrooms_text column
 airbnb$bathrooms = as.numeric(gsub('[a-zA-Z]', '', airbnb$bathrooms_text))
 
+# Saving host_since as a individual variable
+host_since =as.character(airbnb [["host_since"]])
+# Calculate the joining time for each host
+join_time = c()
+for(i in 1: length(host_since )){
+join_time[i] = difftime("2021-12-07", strptime(host_since[i], format = "%Y-%m-%d"), ,unit = "days")
+}
+# Introduce join_time as a new column into data set
+airbnb = cbind(airbnb,join_time)
+
 # Lets remove columns not required for our analysis 
 cols_to_be_removed = c("id","listing_url","scrape_id","last_scraped","name","description","neighborhood_overview",
                       "picture_url","host_id","host_url","host_name","host_since","host_about","host_thumbnail_url",
