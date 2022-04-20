@@ -1,5 +1,5 @@
 # ***** Exploratory Data Analysis ******
-
+library('data.table')
 airbnb = fread(input = "listings.csv")
 
 # Check the structure of the table
