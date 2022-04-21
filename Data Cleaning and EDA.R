@@ -82,6 +82,8 @@ airbnb = airbnb[!is.na(airbnb$review_scores_location) & !is.na(airbnb$review_sco
 airbnb$join_time[which(is.na(airbnb$join_time))] = mean(airbnb$join_time[which(!is.na(airbnb$join_time))])
 
 # count number of verification ways
+install.packages("BBmisc")
+library(BBmisc)
 verification = airbnb [,c("host_verifications")]
 counts_verification = c()
 for (i in 1: dim(verification)[1]){
