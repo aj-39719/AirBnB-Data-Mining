@@ -100,3 +100,25 @@ for (i in 1: dim(amenities)[1]){
 }
 airbnb = cbind(airbnb,counts_amenities)
 airbnb = airbnb[,-c("amenities")]
+
+# Clean verifications & amenities and count unique
+unique_verifications = gsub("[[:punct:]]","",unlist(strsplit(airbnb$host_verifications,split=",")))
+unique_verifications = unique(unique_verifications)
+
+clean_host_verifications = strsplit(gsub("[[:punct:]]","",airbnb$host_verifications), split = " ")
+
+unique_amenities = gsub("[[:punct:]]","",unlist(strsplit(airbnb$host_amenities,split=",")))
+unique_amenities = unique(unique_amenities)
+
+clean_amenities = strsplit(gsub("[[:punct:]]","",airbnb$amenities), split = " ")
+
+
+# # very slow convert to dummy
+# airbnb[ , unique_verifications] <- c(0)
+# for (i in 1:length(clean_host_verifications)) {
+#   for(j in f[[i]]){
+#     if (i %% 1000 == 0) {print(i)}
+#     airbnb$j[i] = 1 
+#   }
+#   
+# }
