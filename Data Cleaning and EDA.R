@@ -109,7 +109,7 @@ unique_verifications = unique(unique_verifications)
 
 clean_host_verifications = strsplit(gsub("[[:punct:]]","",airbnb$host_verifications), split = " ")
 
-unique_amenities = gsub("[[:punct:]]","",unlist(strsplit(airbnb$host_amenities,split=",")))
+unique_amenities = gsub("[[:punct:]]","",unlist(strsplit(airbnb$amenities,split=",")))
 unique_amenities = unique(unique_amenities)
 
 clean_amenities = strsplit(gsub("[[:punct:]]","",airbnb$amenities), split = " ")
