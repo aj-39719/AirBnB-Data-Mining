@@ -81,3 +81,22 @@ airbnb = airbnb[!is.na(airbnb$review_scores_location) & !is.na(airbnb$review_sco
 # turns all NA join times into the mean join time
 airbnb$join_time[which(is.na(airbnb$join_time))] = mean(airbnb$join_time[which(!is.na(airbnb$join_time))])
 
+# count number of verification ways
+verification = airbnb [,c("host_verifications")]
+counts_verification = c()
+for (i in 1: dim(verification)[1]){
+  a = toString(verification[i])
+  counts_verification[i] = length(explode( a,','))
+}
+airbnb = cbind(airbnb,counts_verification)
+airbnb = airbnb[,-c("host_verifications")]
+
+# count number of amenities
+amenities = airbnb [,c("amenities")]
+counts_amenities = c()
+for (i in 1: dim(amenities)[1]){
+  a = toString(amenities[i])
+  counts_amenities[i] = length(explode( a,','))
+}
+airbnb = cbind(airbnb,counts_amenities)
+airbnb = airbnb[,-c("amenities")]
