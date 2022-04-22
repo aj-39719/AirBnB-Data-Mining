@@ -110,6 +110,7 @@ clean_host_verifications = strsplit(gsub("[[:punct:]]","",airbnb$host_verificati
 airbnb = airbnb[,-c("host_verifications")]
 
 unique_amenities = gsub("[[:punct:]]","",unlist(strsplit(airbnb$amenities,split=",")))
+temp = as.factor(unique_amenities) # store factor information before we change unique_amenities
 unique_amenities = unique(unique_amenities)
 
 clean_amenities = strsplit(gsub("[[:punct:]]","",airbnb$amenities), split = " ")
@@ -124,3 +125,18 @@ airbnb = airbnb[,-c("amenities")]
 #   }
 #   
 # }
+
+summary = summary(temp)
+for (i in 1:90) { # remove white space that R introduced
+  if(substring(names(c)[i],1,1)==" ") {
+    names(c)[i] = substring(names(c)[i],2)
+  }
+}
+keepT90 = names(c)[1:90] # top 90 most frequent ammenities
+
+# keep only top 90 amenities and discard the rest
+for (i in 1:length(clean_amenities)) {
+  temp_index = clean_amenities[[i]][1:length(clean_amenities[[i]])] %in% keepT90
+  clean_amenities[[i]] = clean_amenities[[i]][temp_index]
+}
+
