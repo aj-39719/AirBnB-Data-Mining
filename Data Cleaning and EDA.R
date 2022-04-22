@@ -128,11 +128,11 @@ airbnb = airbnb[,-c("amenities")]
 
 summary = summary(temp)
 for (i in 1:90) { # remove white space that R introduced
-  if(substring(names(c)[i],1,1)==" ") {
-    names(c)[i] = substring(names(c)[i],2)
+  if(substring(names(summary)[i],1,1)==" ") {
+    names(summary)[i] = substring(names(summary)[i],2)
   }
 }
-keepT90 = names(c)[1:90] # top 90 most frequent ammenities
+keepT90 = names(summary)[1:90] # top 90 most frequent ammenities
 
 # keep only top 90 amenities and discard the rest
 for (i in 1:length(clean_amenities)) {
