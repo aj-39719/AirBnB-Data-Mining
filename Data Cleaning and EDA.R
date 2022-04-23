@@ -140,3 +140,29 @@ for (i in 1:length(clean_amenities)) {
   clean_amenities[[i]] = clean_amenities[[i]][temp_index]
 }
 
+#### Another way to split amentites cols ###
+# Extract amenities from airbnb data set
+airbnb_amenities = airbnb [,c("amenities")]
+
+# Generate a long list of all strings below this cols; Run slowly-around 3 minutes
+install.packages("BBmisc")
+library(BBmisc)
+total_amenities = c()
+for ( i in 1: dim(airbnb_amenities)[1]){
+a = airbnb_amenities[i,]
+a = toString(a)
+a = explode( a,',')
+c =  gsub("\\[","",a)
+c =  gsub("\\]","",c)
+c = gsub('"',' ',c)
+total_amenities = c(total_amenities,c)
+}
+
+# Select top 10 most frequent cases
+table1 = data.frame (total_amenities)
+w = table(total_amenities)
+w1 = data.frame (w)
+w2 <- w1[order(w1$Freq, decreasing = TRUE), ]
+top_10 = w2$total_amenities[1:10]
+
+
