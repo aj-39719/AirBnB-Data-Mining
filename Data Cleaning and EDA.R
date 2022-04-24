@@ -116,16 +116,6 @@ unique_amenities = unique(unique_amenities)
 clean_amenities = strsplit(gsub("[[:punct:]]","",airbnb$amenities), split = " ")
 airbnb = airbnb[,-c("amenities")]
 
-# # very slow convert to dummy
-# airbnb[ , unique_verifications] <- c(0)
-# for (i in 1:length(clean_host_verifications)) {
-#   for(j in f[[i]]){
-#     if (i %% 1000 == 0) {print(i)}
-#     airbnb$j[i] = 1 
-#   }
-#   
-# }
-
 summary = summary(temp)
 for (i in 1:90) { # remove white space that R introduced
   if(substring(names(summary)[i],1,1)==" ") {
@@ -133,6 +123,7 @@ for (i in 1:90) { # remove white space that R introduced
   }
 }
 keepT90 = names(summary)[1:90] # top 90 most frequent ammenities
+keepT90 = keepT90[-c(29,32,38,74)] # remove duplicate shampoo washer Hot water heating
 
 # keep only top 90 amenities and discard the rest
 for (i in 1:length(clean_amenities)) {
@@ -164,5 +155,22 @@ w = table(total_amenities)
 w1 = data.frame (w)
 w2 <- w1[order(w1$Freq, decreasing = TRUE), ]
 top_10 = w2$total_amenities[1:10]
+
+# convert to dummy
+# create temporary table first of all 0s for every dummy
+temp_table = airbnb[,1:2]
+temp_table[ , keepT90] <- c(0)
+temp_table = temp_table[,3:length(temp_table[1])]
+
+# for every amenity go to the appropriate dummy column and turn that 
+# flat's value to 1
+for (i in 1:length(clean_amenities)) {
+  for (j in clean_amenities[[i]]){
+   if (i %% 1000 == 0) {print(i)}
+   temp_table[[j]][i] = 1 
+ }
+}
+# attach the dummy columns to main data table
+airbnb = cbind(airbnb,temp_table)
 
 
