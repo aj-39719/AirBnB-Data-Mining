@@ -166,7 +166,7 @@ temp_table = temp_table[,3:length(temp_table[1])]
 # flat's value to 1
 for (i in 1:length(clean_amenities)) {
   for (j in clean_amenities[[i]]){
-   if (i %% 1000 == 0) {print(i)}
+   #if (i %% 1000 == 0) {print(i)}
    temp_table[[j]][i] = 1 
  }
 }
