@@ -173,4 +173,23 @@ for (i in 1:length(clean_amenities)) {
 # attach the dummy columns to main data table
 airbnb = cbind(airbnb,temp_table)
 
+# Encode t/f to binary variable 1/0;
+airbnb$host_is_superhost[airbnb$host_is_superhost == "t"] = 1
+airbnb$host_is_superhost[airbnb$host_is_superhost == "f"] = 0
+airbnb$host_has_profile_pic[airbnb$host_has_profile_pic == "t"] = 1
+airbnb$host_has_profile_pic[airbnb$host_has_profile_pic == "f"] = 0
+airbnb$host_identity_verified[airbnb$host_identity_verified == "t"] = 1
+airbnb$host_identity_verified[airbnb$host_identity_verified == "f"] = 0
+
+# Pca on 7 scores
+airbnb_score = airbnb [, c("review_scores_rating","review_scores_accuracy","review_scores_cleanliness","review_scores_checkin","review_scores_communication","review_scores_location","review_scores_value")]
+airbnb_score_scale = scale(airbnb_score) # standardisd each variables
+pca = prcomp(airbnb_score_scale,scale=TRUE,center = TRUE) # compute pca
+names(pca)
+summary(pca)
+props = pca$sdev^2 / sum(pca$sdev^2)
+plot(props,type="b")
+#cumprops = cumsum(props)
+#plot(cumprops,type="b",ylim = c(0,1))
+
 
