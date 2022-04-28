@@ -394,8 +394,8 @@ airbnb = airbnb[!is.na(airbnb$host_is_superhost) &
 
 set.seed(1)
 test_set_indices = sample(1:nrow(airbnb),round(0.3*nrow(airbnb)),replace = FALSE)
-training_set = airbnb_location[-test_set_indices,]
-test_set = airbnb_location[test_set_indices,]
+training_set = airbnb[-test_set_indices,]
+test_set = airbnb[test_set_indices,]
 
 # IMPUTING VALUES ON TRAINING SET :-
 
