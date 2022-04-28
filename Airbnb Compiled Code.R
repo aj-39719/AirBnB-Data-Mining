@@ -1,6 +1,7 @@
-# ******************************* IMPORTING DATA AND LIBRARIES ********************************** 
+# ********************************** IMPORTING DATA AND LIBRARIES ************************************* 
 #install.packages("BBmisc")
-#install.packages("data.table")'#install.packages("caret")
+#install.packages("data.table")
+#install.packages("caret")
 #install.packages("ggplot2")
 #install.packages("corrplot")
 #install.packages("tree")
@@ -9,6 +10,8 @@
 #install.packages("ModelMetrics")
 # install.packages("polywog")
 # install.packages("rpart.plot")
+#install.packages("kernlab")
+library(kernlab)
 library(BBmisc)
 library(data.table)
 library(corrplot)
@@ -41,7 +44,7 @@ hist(colMeans(is.na(airbnb)),
      ylim = c(0,65))
 
 
-# ********************************** PRELIMINARY DATA CLEANING *********************************
+# ********************************** PRELIMINARY DATA CLEANING **************************************
 
 
 blank_cols = c("neighbourhood_group_cleansed","calendar_updated","license")
@@ -93,7 +96,7 @@ hist(colMeans(is.na(airbnb)),
 
 
 
-# **************************** EXPLORATORY DATA ANALYSIS OF RAW DATA *******************************
+# **************************** EXPLORATORY DATA ANALYSIS OF RAW DATA ******************************
 
 
 #  ****** Most frequent neighborhoods ******
@@ -351,11 +354,413 @@ airbnb$host_has_profile_pic[airbnb$host_has_profile_pic == "t"] = 1
 airbnb$host_has_profile_pic[airbnb$host_has_profile_pic == "f"] = 0
 airbnb$host_identity_verified[airbnb$host_identity_verified == "t"] = 1
 airbnb$host_identity_verified[airbnb$host_identity_verified == "f"] = 0
+airbnb$has_availability[airbnb$has_availability == "t"] = 1
+airbnb$has_availability[airbnb$has_availability == "f"] = 0
+airbnb$instant_bookable[airbnb$instant_bookable == "t"] = 1
+airbnb$instant_bookable[airbnb$instant_bookable == "f"] = 0
+
+# Encoding Categorical Variables
+airbnb$host_response_time[is.na(airbnb$host_response_time)] = 0
+airbnb$host_response_time[airbnb$host_response_time == "within an hour"] = 1
+airbnb$host_response_time[airbnb$host_response_time == "within a few hours"] = 2
+airbnb$host_response_time[airbnb$host_response_time == "within a day"] = 3
+airbnb$host_response_time[airbnb$host_response_time == "a few days or more"] = 4
+
+airbnb$host_response_rate = (as.numeric(gsub("%$","",airbnb$host_response_rate)))/100
+airbnb$host_acceptance_rate = (as.numeric(gsub("%$","",airbnb$host_acceptance_rate)))/100
+
+
+# Since the columns where response time was NA, the response rate was also NA, hence we equate it to 0
+airbnb$host_response_rate[is.na(airbnb$host_response_rate)] = 0 
+
+# Converting price column to numeric type
+airbnb$price = as.numeric(gsub("\\$", "", airbnb$price)) 
+
+# Imputing values for Price by Room_type and neighborhood (351 values)
+airbnb[,price := replace(price, is.na(price), median(price, na.rm=TRUE)),
+             by=.(room_type,neighbourhood_cleansed)]
+
+
+# Remove irrelevant columns with too many missing values that cant be imputed
+airbnb = airbnb[!is.na(airbnb$host_is_superhost) & 
+                  !is.na(airbnb$host_total_listings_count) &
+                  !is.na(airbnb$host_identity_verified)&
+                  !is.na(airbnb$host_location)]
 
 
 
-# ********************************** PREDICTING LOCATION REVIEWS ****************************
+
+# ********************************* TRAINING AND TESTING SPLIT **********************************
+
+set.seed(1)
+test_set_indices = sample(1:nrow(airbnb),round(0.3*nrow(airbnb)),replace = FALSE)
+training_set = airbnb_location[-test_set_indices,]
+test_set = airbnb_location[test_set_indices,]
+
+# IMPUTING VALUES ON TRAINING SET :-
+
+#imputing values for bathroom by Room_type (168 values)
+training_set[,bathrooms := replace(bathrooms, is.na(bathrooms), 
+                                   median(bathrooms, na.rm=TRUE)),by=.(room_type)]
+
+#imputing values for beds by Room_type (2188 values)
+training_set[,beds := replace(beds, is.na(beds), 
+                              median(beds, na.rm=TRUE)),by=.(room_type)]
+
+#imputing values for bedrooms by Room_type (2520 values)
+training_set[,bedrooms := replace(bedrooms, is.na(bedrooms),median(bedrooms, na.rm=TRUE)),by=.(room_type)]
+
+
+# Convert all Character type variables to Factors
+training_set = training_set %>% mutate_if(sapply(training_set, is.character), as.factor)
+test_set = test_set %>% mutate_if(sapply(test_set, is.character), as.factor)
 
 
 
+# ********************************** PREDICTING LOCATION REVIEWS *************************************
 
+set.seed(1)
+airbnb_location = airbnb[,c("latitude","longitude","review_scores_location")]
+colMeans(is.na(airbnb_location)) # no missing value
+summary(airbnb_location)
+
+
+# EDA
+hist(training_set$latitude, main = "Histogram of latitude", xlab = "latitude") 
+# looks like normal distribution
+
+hist(training_set$longitude,main = "Histogram of longitude", xlab = "longitude")
+# looks like normal distribution
+
+hist(training_set$review_scores_location,main = "Histogram of location score", xlab = "location score")
+# skewed to the right, needs some transformation
+
+log_location = log(training_set$review_scores_location)# taking logarithm
+hist(log_location,main = "Histogram of log(location score)", xlab = "log(location score)")
+# still not normal
+
+pairs(airbnb_location) 
+corrplot(cor(airbnb_location), method = "circle", diag = FALSE,type = "upper")
+
+# 1) latitude is positively correlated with longitude
+# 2) latitude does not correlated with location score
+# 3) longitude is slightly negatively correlated with location score
+
+
+# LINEAR REGRESSION MODEL
+
+lm_reg = train(review_scores_location ~ latitude + longitude,
+               data = training_set, method = 'lm',
+               trControl = trainControl(method = 'repeatedcv' , number = 10, repeats = 3),
+               preProcess = c('center','scale'))
+lm_reg$finalModel
+# Result is consistent with correlation table, showing that latitude does not play a significant role 
+# in the model and longitude is negatively related to the location score.
+# linear model is location score = -0.026123*scale(longitude)+0.002919*scale(latitude)+4.746319
+# it is not a good model since r square is almost zero, which means it doesn't explain any variation
+# Training RMSE = 0.4341842
+
+rmse(test_set$review_scores_location,
+     predict(lm_reg,test_set[,c("latitude","longitude"),drop=FALSE])) 
+# Testing RMSE = 0.4009447   
+par(mfrow=c(2,2))
+plot(lm_reg$finalModel) 
+# implies residual is not normally distributed,thus confirmed that this model doesn't explain.
+
+# Model selection
+regfit_full = regsubsets(review_scores_location~. , data=training_set)
+summary_full = summary(regfit_full)
+plot(summary_full$rss,type="b")
+
+# LINEAR REGRESSION WITH LONGITUDE ONLY
+
+lm_reg_onlyl = train(review_scores_location ~ longitude,
+                     data = training_set, method = 'lm',
+                     trControl = trainControl(method = 'repeatedcv' , number = 10, repeats = 3),
+                     preProcess = c('center','scale'))
+
+rmse(test_set$review_scores_location,predict(lm_reg_onlyl,test_set[,c("latitude","longitude"),drop=FALSE]))
+# Training RMSE = 0.4340705, Test RMSE = 0.4009162
+
+par(mfrow=c(2,2))
+plot(lm_reg_onlyl$finalModel) # still pretty bad
+
+# LINEAR REGRESSION ON LOG OF REVIEW SCORES
+
+lm2_reg = train(log(review_scores_location+1) ~ latitude + longitude, 
+                # Since log0 is undefined, we will add 1 to each score to avoid it.
+                data = training_set, method = 'lm',
+                trControl = trainControl(method = 'repeatedcv' , number = 10, repeats = 3),
+                preProcess = c('center','scale'))
+lm2_reg
+summary(lm2_reg$finalModel)
+rmse(log(test_set$review_scores_location+1),predict(lm2_reg,test_set[,c("latitude","longitude"),drop=FALSE]))
+plot(lm2_reg$finalModel)
+# Training RMSE = 0.1017434, Test RMSE =  0.08886645 
+# plot still bad - heavy tails
+
+# POLYNOMIAL REGRESSION
+
+poly_reg = cv.polywog(review_scores_location ~ scale(latitude) + scale(longitude),
+                      data = training_set, degrees.cv = 1:20,
+                      nfolds = 10,thresh = 1e-4)
+poly_reg$degree.min # the best degree is 6
+poly_reg$polywog.fit
+poly_reg_model<- bootPolywog(poly_reg$polywog.fit, nboot = 3)
+rmse(test_set$review_scores_location,
+     predict(poly_reg_model,test_set[,c("latitude","longitude"),drop=FALSE])) 
+
+rmse(training_set$review_scores_location,
+     predict(poly_reg_model,training_set[,c("latitude","longitude"),drop=FALSE]))
+plot(poly_reg_model)
+# Training RMSE = 0.4283884, Test RMSE = 0.3961075 
+
+
+# DECISION TREE REGRESSION
+
+tree_location <- tree (review_scores_location~. , data=training_set)
+summary(tree_location )
+plot (tree_location)
+text (tree_location , pretty = 0)
+
+# Cross-validation to choose the best tree
+cp.grid = expand.grid(.cp = (0:10)*0.001)
+tree_reg = train(review_scores_location ~ latitude + longitude,
+                 data = training_set, method = 'rpart',
+                 trControl = trainControl(method = 'repeatedcv' , number = 10, repeats = 3),
+                 tuneGrid = cp.grid )
+#tree_reg 
+best.tree = tree_reg$finalModel
+
+prp(best.tree) # the best cp is 0.001                
+mean ((predict (best.tree , newdata =training_set) - training_set$review_scores_location)^2) 
+mean ((predict (best.tree , newdata =test_set) - test_set$review_scores_location)^2)  
+#  training data: MSE = 0.1781331; RMSE = 0.4220582 ;testing data: MSE = 0.1378898; RMSE = 0.3713352
+
+
+# SVM REGRESSION : RADIAL KERNEL
+
+#svm_reg_linear = train(review_scores_location ~ latitude + longitude,
+#                data = training_set, method = 'svmRadial',
+#                trControl = trainControl(method = 'repeatedcv' , number = 10, repeats = 3),
+#                preProcess = c('center','scale'),
+#                 tuneGrid = expand.grid(C = seq(0, 1, length = 10),sigma = c(0.1,0.2)))
+# Since data set is very large over 40000 instance, when I run the code for tuning parameter it doesn't work.
+
+# fit in radial kernel 
+plot(training_set[,1:2],col=training_set$review_scores_location+3,asp=0) 
+
+# EPS REGRESSION: no control of number of support vectors
+
+svmfit1 = svm(review_scores_location~. ,data=training_set, kernel="radial" ,scale=TRUE) # needs around 5 minutes to run
+summary(svmfit1) 
+rmse(training_set$review_scores_location,predict(svmfit1,training_set[,1:2])) 
+rmse(test_set$review_scores_location,predict(svmfit1,test_set[,1:2]))
+# Testing set RMSE = 0.4064776 ; Training set RMSE = 0.4404114
+
+# SVM REGRESSION : LINEAR KERNEL
+
+svmfit2 = svm(review_scores_location~. ,data=training_set, kernel="linear" ,scale=TRUE)
+rmse(training_set$review_scores_location,predict(svmfit2,training_set[,1:2]))
+rmse(test_set$review_scores_location,predict(svmfit2,test_set[,1:2]))
+# testing set RMSE =0.4192826 ; training set RMSE = 0.4533505
+
+# SVM REGRESSION : POLYNOMIAL KERNEL
+
+svmfit3 = svm(review_scores_location~. ,data=training_set, kernel="polynomial" ,scale=TRUE)
+rmse(training_set$review_scores_location,predict(svmfit3,training_set[,1:2]))
+rmse(test_set$review_scores_location,predict(svmfit3,test_set[,1:2]))
+# testing set RMSE =  0.4199995 # training set RMSE = 0.4537708
+
+## KNN REGRESSION
+
+tuneGrid = expand.grid(k = seq(1,59, by = 2))
+
+#Warning - the next line of code takes about 8 minutes to execute
+knn_reg = train(review_scores_location ~ latitude + longitude,
+                data = training_set, method = 'knn',
+                preProcess = c('center','scale'),
+                trControl = trainControl(method = 'repeatedcv' , number = 10, repeats = 3),
+                tuneGrid = tuneGrid)
+
+knn_results = knn_reg$results #lowest testing RMSE for k = 59
+knn_results
+plot(knn_reg)
+varImp(knn_reg) #it is taking longitude to be the most important variable of importance, as seen above
+
+pred_knn = predict(knn_reg, newdata = test_set)
+RMSE(pred_knn,test_set$review_scores_location)
+# Test RMSE = 0.3891 ; Training RMSE = 0.4224938 
+
+
+
+# ********************************** PREDICTING COMMUNICATION REVIEWS ***********************************
+
+airbnb_communication = airbnb |> select(-host_acceptance_rate,-host_neighbourhood,
+                                        -host_location, -property_type, -neighbourhood_cleansed,
+                                        -review_scores_rating, - review_scores_accuracy,
+                                        -review_scores_cleanliness, -review_scores_checkin,
+                                        -review_scores_location, -review_scores_value)
+
+
+
+colSums(is.na(airbnb_communication)) # no missing value
+
+
+# ***** Decision Tree Model ******
+
+tree_model = tree(review_scores_communication ~. , data = training_set)
+tree_model
+plot(tree_model)
+text(tree_model, pretty = 0)
+
+tree_pred = predict(tree_model, test_set)
+mean((tree_pred - test_set$review_scores_communication)^2) # Test MSE = 0.0839 and RMSE = 0.2897
+
+
+# ****** KNN Model *******
+
+tuneGrid = expand.grid(k = seq(1,59, by = 2))
+knn_reg = train(review_scores_communication ~ calculated_host_listings_count + availability_90,
+                data = training_set, method = 'knn',
+                preProcess = c('center','scale'),
+                trControl = trainControl(method = 'repeatedcv' , number = 10, repeats = 3),
+                tuneGrid = tuneGrid)
+
+knn_results = knn_reg$results # No result for RMSE, too many ties
+
+
+# ********************************** PREDICTING CHECKIN REVIEWS ***********************************
+##clean data for check in score
+# we select acceptance rate, response time, super host, price, instant bookable as attributes
+set.seed(1)
+check_in = airbnb[, c("host_acceptance_rate","host_response_time","host_is_superhost","price","instant_bookable","review_scores_checkin")]
+colMeans(is.na(check_in))
+# missing value col:host_acceptance_rate, host_response_time , host_is_superhost
+# 45% and 49% missing rate in acceptance rate and response rate respectively
+summary(check_in)
+
+# host reSponse time: categorical; present NA as a new category
+table(check_in$host_response_time)
+# combine small cases into a large group: NA,quick,slow
+check_in$host_response_time[is.na(check_in$host_response_time)] = "NA"
+check_in$host_response_time[check_in$host_response_time == "within an hour"|check_in$host_response_time == "within a few hours"] = "quick"
+check_in$host_response_time[check_in$host_response_time == "within a day"|check_in$host_response_time == "a few days or more"] = "slow"
+
+
+# host_is_superhost; present na as a new category
+table(check_in$host_is_superhost)# small portion of missing value may carry important information
+check_in$host_is_superhost[is.na(check_in$host_is_superhost)] = "NA"
+check_in$host_is_superhost[check_in$host_is_superhost == "t"] = 1
+check_in$host_is_superhost[check_in$host_is_superhost == "f"] = 0
+
+# price
+check_in$price=gsub("\\$", "", check_in$price)
+check_in$price=gsub(",", "", check_in$price)
+check_in$price = as.numeric(check_in$price )
+
+#instant bookable
+check_in$instant_bookable[check_in$instant_bookable == "t"] = 1
+check_in$instant_bookable[check_in$instant_bookable == "f"] = 0
+
+#host_acceptance_rate
+check_in$host_acceptance_rate = (as.numeric(gsub("%","",check_in$host_acceptance_rate)))/100
+#impute unknown by the median in training set
+test_set_indices = sample(1:nrow(check_in),round(0.3*nrow(check_in)),replace = FALSE)
+training_set = check_in[-test_set_indices,]
+test_set = check_in[test_set_indices,]
+summary(training_set) # median = 0.910 
+training_set$host_acceptance_rate[is.na(training_set$host_acceptance_rate)] = 0.910
+test_set$host_acceptance_rate[is.na(test_set$host_acceptance_rate)] = 0.910
+# convert all character into factor
+library(dplyr)
+training_set = training_set %>% mutate_if(sapply(training_set, is.character), as.factor)
+test_set = test_set %>% mutate_if(sapply(test_set, is.character), as.factor)
+# check
+colMeans(is.na(training_set))
+colMeans(is.na(test_set))
+summary(training_set)
+summary(test_set)
+
+# EDA
+continuous_var = training_set[,c("host_acceptance_rate","price","review_scores_checkin")]
+corrplot(cor(continuous_var), method = "circle", diag = FALSE)
+# shows price and acceptance rate both are slightlt negtively correlated with check in score;
+# almost no relationship between attributes
+training_set %>% ggplot(aes(y=review_scores_checkin, x=factor(host_response_time)))+ geom_boxplot() 
+training_set %>% ggplot(aes(y=review_scores_checkin, x=factor(host_is_superhost)))+ geom_boxplot() 
+training_set %>% ggplot(aes(y=review_scores_checkin, x=factor(instant_bookable)))+ geom_boxplot() 
+
+install.packages("polywog")
+install.packages("rpart.plot")
+library(corrplot)
+library(caret)
+library(data.table)
+library(ggplot2)
+library(ModelMetrics)
+library(polywog)
+library (tree)
+library(rpart.plot)
+library(e1071)
+##linear regression
+# convert them factor into numeric 
+training_set1 = training_set %>% mutate_if(sapply(training_set, is.factor), as.numeric)
+test_set1 = test_set %>% mutate_if(sapply(test_set, is.factor), as.numeric)
+lm_reg = train( review_scores_checkin~.,
+                data =training_set1 ,
+                method = 'lm',
+                trControl = trainControl(method = 'repeatedcv' , number = 10, repeats = 3),
+                preProcess = c('center','scale'))
+lm_reg$finalModel
+summary(lm_reg$finalModel)
+# all variables are significant,
+par(mfrow=c(2,2))
+plot(lm_reg$finalModel) # residual plots are bad.
+# rmse for training set:  0.4749543; rmse for test set is 0.4459939
+rmse(training_set1$review_scores_checkin,predict(lm_reg,training_set1[,-c("review_scores_checkin"),drop=FALSE]))
+rmse(test_set1$review_scores_checkin,predict(lm_reg,test_set1[,-c("review_scores_checkin"),drop=FALSE]))
+
+## Decision tree regression
+library(tree)
+library(rpart.plot)
+tree_checkin<- tree (review_scores_checkin~. , data=training_set)
+summary(tree_checkin )
+plot (tree_checkin)
+text (tree_checkin , pretty = 0)
+# rmse in training set = 0.4778013; rmse in testing set is 0.4478906
+mean ((predict (tree_checkin , newdata =training_set) - training_set$review_scores_checkin)^2) 
+mean ((predict (tree_checkin , newdata =test_set) - test_set$review_scores_checkin)^2)
+# only care about superhost: if it is superhost, then it would be higher score
+# use cv for a more detailed subtree
+cp.grid = expand.grid(.cp = (0:10)*0.001)
+tree_reg = train(review_scores_checkin~.,
+                 data = training_set1, method = 'rpart',
+                 trControl = trainControl(method = 'repeatedcv' , number = 10, repeats = 3),
+                 tuneGrid = cp.grid )
+tree_reg 
+best.tree = tree_reg$finalModel
+prp(best.tree) # the best cp is 0.001  
+# rmse for training set is 0.4719312;
+mean ((predict (best.tree , newdata =training_set1) - training_set1$review_scores_checkin)^2) 
+# rmse for training set is 0.4440508
+mean ((predict (best.tree , newdata =test_set1) - test_set1$review_scores_checkin)^2) 
+
+#log transform check in score perform still not good
+
+## SVM Regression: choose radial kernel
+library(caret)
+# fit in radial kernal 
+# eps-regression: no control of number of support vectors
+svmfit1 = svm(review_scores_checkin~. ,data=training_set1, kernel="radial" ,scale=TRUE) # needs around 5 minutes to run
+summary(svmfit1) 
+# training set rmse = 0.4959456
+rmse(training_set1$review_scores_checkin,predict(svmfit1,training_set1)) 
+# Testing set rmse = 0.4646491
+rmse(test_set1$review_scores_checkin,predict(svmfit1,test_set1))
+
+# fit in linear kernal svm regression
+svmfit2 = svm(review_scores_checkin~. ,data=training_set1, kernel="linear" ,scale=TRUE)
+# training set rmse = 0.5046351
+rmse(training_set1$review_scores_checkin,predict(svmfit2,training_set1))
+# testing set rmse = 0.4731245
+rmse(test_set1$review_scores_checkin,predict(svmfit2,test_set1))
