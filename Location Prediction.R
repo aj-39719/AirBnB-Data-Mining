@@ -7,11 +7,17 @@
 #install.packages("e1071")
 #install.packages("leaps")
 #install.packages("ModelMetrics")
+install.packages("polywog")
+install.packages("rpart.plot")
 library(corrplot)
 library(caret)
 library(data.table)
 library(ggplot2)
 library(ModelMetrics)
+library(polywog)
+library (tree)
+library(rpart.plot)
+library(e1071)
 
 #path = '/Users/admin/Downloads/listings.csv'
 airbnb = fread(input = "listings.csv")
@@ -169,8 +175,7 @@ for (i in 1:length(clean_amenities)) {
 airbnb = cbind(airbnb,temp_table)
 
 
-# Location
-
+# Location score analysis
 set.seed(1)
 airbnb_location = airbnb[,c("latitude","longitude","review_scores_location")]
 colMeans(is.na(airbnb_location)) # no missing value
@@ -183,81 +188,134 @@ training_set = airbnb_location[-test_set_indices,]
 test_set = airbnb_location[test_set_indices,]
 
 # EDA
-hist(training_set$latitude) # lookes like normal distribution
-hist(training_set$longitude) # looks like normal distribution
-hist(training_set$review_scores_location)# skewed to the right, needs some transformation
+hist(training_set$latitude, main = "Histogram of latitude", xlab = "latitude") 
+# lookes like normal distribution
 
+hist(training_set$longitude,main = "Histogram of longitude", xlab = "longitude")
+# looks like normal distribution
+
+hist(training_set$review_scores_location,main = "Histogram of location score", xlab = "location score")
+# skewed to the right, needs some transformation
 # taking log as log_location = log(training_set$review_scores_location)
 log_location = log(training_set$review_scores_location)
-hist(log_location) # still not normal
-
+hist(log_location,main = "Histogram of log(location score)", xlab = "log(location score)")
+# still not normal
 
 pairs(airbnb_location) 
-
 corrplot(cor(airbnb_location), method = "circle", diag = FALSE,type = "upper")
+# shows that 1) latitute is positively correlated with longitude
+# 2) latitute does not correlated with location score
+# 3) longitute is slightly negatively correlated with location score
 
 
-## Fit in linear regession model (can not be used)
-lm1 = lm(review_scores_location ~ latitude + longitude ,data=training_set)
-summary(lm1)
+# Fit in linear regession model
+lm_reg = train(review_scores_location ~ latitude + longitude,
+                data = training_set, method = 'lm',
+                trControl = trainControl(method = 'repeatedcv' , number = 10, repeats = 3),
+                preProcess = c('center','scale'))
+lm_reg$finalModel
+# Result is consistent with correlation table, showing that latitude does not play a significant role # in the model and longitude is negatively related to the location score.
+# linear model is location score = -0.026123*scale(longitude)+0.002919*scale(latitude)+4.746319
+# it is not a good model since r square is almost zero, which means it doesn't explain any variation
+# rmse = 0.4341842 for training set
+rmse(test_set$review_scores_location,predict(lm_reg,test_set[,c("latitude","longitude"),drop=FALSE])) # rmse = 0.4009447 for testing set            
 par(mfrow=c(2,2))
-plot(lm1) # implies not normally distributed
-
-lm2 = lm(review_scores_location ~ longitude ,data=training_set)
-summary(lm2)
-
-# Test on test dataset
-library(ModelMetrics)
-# training set mse = 0.188853 ; rmse = 0.4345722
-rmse(training_set$review_scores_location,predict(lm1,training_set[,c("latitude","longitude"),drop=FALSE]))
-# test set mse = 0.1607567 ; rmse = 0.4009448
-rmse(test_set$review_scores_location,predict(lm1,test_set[,c("latitude","longitude"),drop=FALSE]))
+plot(lm_reg$finalModel) # implies residual is not normally distributed，thus confirmed that this model doesn't explain.
 
 # Model selection
-library(leaps)
 regfit_full = regsubsets(review_scores_location~. , data=training_set)
 summary_full = summary(regfit_full)
-# Best way is to keep both variables
+plot(summary_full$rss,type="b")
+lm_reg_onlyl = train(review_scores_location ~ longitude,
+                data = training_set, method = 'lm',
+                trControl = trainControl(method = 'repeatedcv' , number = 10, repeats = 3),
+                preProcess = c('center','scale'))
+# rmse = 0.4340705 for training set
+rmse(test_set$review_scores_location,predict(lm_reg_onlyl,test_set[,c("latitude","longitude"),drop=FALSE]))
+# rmse = 0.4009162 for test set
+par(mfrow=c(2,2))
+plot(lm_reg_onlyl$finalModel) # still pretty bed
+
+# Since log0 is undefined, we will add 1 to each score to avoid it.
+lm2_reg = train(log(review_scores_location+1) ~ latitude + longitude,
+                data = training_set, method = 'lm',
+                trControl = trainControl(method = 'repeatedcv' , number = 10, repeats = 3),
+                preProcess = c('center','scale'))
+lm2_reg
+summary(lm2_reg$finalModel)
+rmse(log(test_set$review_scores_location+1),predict(lm2_reg,test_set[,c("latitude","longitude"),drop=FALSE]))
+plot(lm2_reg$finalModel)
+# rmse = 0.1017434  for training set; rmse =  0.08886645 for testing set;plot still bad:heavy tails
+
+# try polynomial regression
+poly_reg = cv.polywog(review_scores_location ~ scale(latitude) + scale(longitude),
+                data = training_set, degrees.cv = 1:20,
+                nfolds = 10,thresh = 1e-4)
+poly_reg$degree.min # the best degree is 6
+poly_reg$polywog.fit
+poly_reg_model<- bootPolywog(poly_reg$polywog.fit, nboot = 3)
+rmse(test_set$review_scores_location,predict(poly_reg_model,test_set[,c("latitude","longitude"),drop=FALSE])) # rmse = 0.3961075 for test set
+rmse(training_set$review_scores_location,predict(poly_reg_model,training_set[,c("latitude","longitude"),drop=FALSE])) # rmse = 0.4283884 for traininng set
+plot(poly_reg_model)
 
 
 ## Decision Tree - Regression
-library (tree)
+# initial idea of tree
 tree_location <- tree (review_scores_location~. , data=training_set)
 summary(tree_location )
 plot (tree_location)
 text (tree_location , pretty = 0)
-p1 <- predict (tree_location , newdata =test_set)
-p2 <- predict (tree_location , newdata =training_set)
-mean ((p2 - training_set$review_scores_location)^2) # training data: mse = 0.1873069; rmse = 0.4327897
-mean ((p1 - test_set$review_scores_location)^2)  # testing data: mse = 0.1592019; rmse = 0.3990011
+# cv to choose the best tree
+cp.grid = expand.grid(.cp = (0:10)*0.001)
+tree_reg = train(review_scores_location ~ latitude + longitude,
+                data = training_set, method = 'rpart',
+                trControl = trainControl(method = 'repeatedcv' , number = 10, repeats = 3),
+                tuneGrid = cp.grid )
+tree_reg 
+best.tree = tree_reg$finalModel
+prp(best.tree) # the best cp is 0.001                
+mean ((predict (best.tree , newdata =training_set) - training_set$review_scores_location)^2) 
+# training data: mse = 0.1781331; rmse = 0.4220582
+mean ((predict (best.tree , newdata =test_set) - test_set$review_scores_location)^2)  
+# testing data: mse = 0.1378898; rmse = 0.3713352
 
 
-## SVM Regression
+## SVM Regression: choose radial kernel
+library(caret)
+#install.packages("kernlab")
+#library(kernlab)
+#svm_reg_linear = train(review_scores_location ~ latitude + longitude,
+#                data = training_set, method = 'svmRadial',
+#                trControl = trainControl(method = 'repeatedcv' , number = 10, repeats = 3),
+#                preProcess = c('center','scale'),
+#                 tuneGrid = expand.grid(C = seq(0, 1, length = 10),sigma = c(0.1,0.2)))
+# Since data set is very large over 40000 instance, when I run the code for tuning parameter it doesn't work.
+
 # fit in radial kernal 
-library(e1071)
-plot(training_set[,1:2],col=training_set$review_scores_location+3,asp=0) # circle, suggest using radial kernal
+plot(training_set[,1:2],col=training_set$review_scores_location+3,asp=0) 
 # eps-regression: no control of number of support vectors
-svmfit1 = svm(review_scores_location~. ,data=training_set, kernel="radial" ,scale=FALSE) # needs around 5 minutes to run
+svmfit1 = svm(review_scores_location~. ,data=training_set, kernel="radial" ,scale=TRUE) # needs around 5 minutes to run
 summary(svmfit1) 
-library(ModelMetrics)
-# training set mse is 0.2021391;rmse = 0.4495988
+# training set rmse = 0.4404114
 rmse(training_set$review_scores_location,predict(svmfit1,training_set[,1:2])) 
-# Testing set mse is 0.1728991; rmse = 0.4158114
+# Testing set rmse = 0.4064776
 rmse(test_set$review_scores_location,predict(svmfit1,test_set[,1:2]))
 
 # fit in linear kernal svm regression
-svmfit2 = svm(review_scores_location~. ,data=training_set, kernel="linear" ,scale=FALSE)
-# training set mse is 0.2052773; rmse = 0.4530754
+svmfit2 = svm(review_scores_location~. ,data=training_set, kernel="linear" ,scale=TRUE)
+# training set rmse = 0.4533505
 rmse(training_set$review_scores_location,predict(svmfit2,training_set[,1:2]))
-# testing set mse is  0.1756722; rmse = 0.4191327
+# testing set rmse =0.4192826
 rmse(test_set$review_scores_location,predict(svmfit2,test_set[,1:2]))
 
 # fit in polynomial kernal svm regression
-svmfit3 = svm(review_scores_location~. ,data=training_set, kernel="polynomial" ,scale=FALSE)
-# training set  rmse = 337.2504
+svmfit3 = svm(review_scores_location~. ,data=training_set, kernel="polynomial" ,scale=TRUE)
+# training set rmse = 0.4537708
 rmse(training_set$review_scores_location,predict(svmfit3,training_set[,1:2]))
-# testing set rmse = 337.2485
+# testing set rmse =  0.4199995
 rmse(test_set$review_scores_location,predict(svmfit3,test_set[,1:2]))
+
+
 
 ## KNN Regression
 
