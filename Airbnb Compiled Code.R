@@ -16,6 +16,8 @@
 #install.packages("RColorBrewer")
 #install.packages("randomForest")
 #install.packages("gbm")
+#install.packages("factoextra")
+library(factoextra)
 library(ggthemes)
 library(kernlab)
 library(BBmisc)
@@ -361,6 +363,24 @@ airbnb$price = gsub(",","",airbnb$price)
 
 # Converting price column to numeric type
 airbnb$price = as.numeric(gsub("\\$", "", airbnb$price)) 
+                                        
+# ********************************* PCA ANALYSIS ON REVIEW SCORES **********************************                                        
+airbnb_score = airbnb [, c("review_scores_rating","review_scores_accuracy","review_scores_cleanliness","review_scores_checkin","review_scores_communication","review_scores_location","review_scores_value")]
+airbnb_score_scale = scale(airbnb_score) # standardisd each variables
+pca = prcomp(airbnb_score_scale,scale=TRUE,center = TRUE) # compute pca
+names(pca)
+summary(pca)
+props = pca$sdev^2 / sum(pca$sdev^2)
+plot(props,type="b")
+#cumprops = cumsum(props)
+#plot(cumprops,type="b",ylim = c(0,1))
+install.packages("factoextra")
+library("factoextra")
+eig.val <- get_eigenvalue(pca)
+eig.val 
+# the eigenvalue for the rating score is the largest, indicates rating score is the most important.                                       
+                                        
+                                        
 
 # ********************************* TRAINING AND TESTING SPLIT **********************************
 
