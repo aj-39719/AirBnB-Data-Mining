@@ -888,3 +888,319 @@ varImp(knn_reg_rating)
 pred_knn_rating = predict(knn_reg_rating, newdata = test_set_rating)
 RMSE(pred_knn_rating,test_set_rating$review_scores_rating)
 # Test RMSE = 0.4885923 , Training RMSE = 0.5050278 (lowest for k = 59)
+
+
+
+# ********************************** PREDICTING ACCURACY REVIEWS *****************************************
+
+training_set_accuracy = training_set[,-c("host_location","host_neighbourhood",
+                                         "neighbourhood_cleansed","property_type",
+                                         "room_type","review_scores_rating",
+                                         "review_scores_communication","review_scores_location",
+                                         "review_scores_value","review_scores_checkin",
+                                         "review_scores_cleanliness")]
+
+test_set_accuracy = test_set[,-c("host_location","host_neighbourhood",
+                                 "neighbourhood_cleansed","property_type",
+                                 "room_type","review_scores_rating",
+                                 "review_scores_communication","review_scores_location",
+                                 "review_scores_value","review_scores_checkin",
+                                 "review_scores_cleanliness")]
+
+hist(training_set_accuracy$review_scores_accuracy) # not normal distributed log doesn't work
+summary(training_set_accuracy )
+training_set_accuracy = training_set_accuracy %>% mutate_if(sapply(training_set_accuracy, is.factor), as.numeric)
+test_set_accuracy = test_set_accuracy %>% mutate_if(sapply(test_set_accuracy, is.factor), as.numeric)
+
+# linear regression
+lm_full = lm(review_scores_accuracy~.,data =training_set_accuracy)
+summary(lm_full)
+# can explain 10% variance
+par(mfrow=c(2,2))
+plot(lm_full)# heavy tails residuals are not normally distributed
+
+rmse(training_set_accuracy$review_scores_accuracy,predict(lm_full,training_set_accuracy))
+rmse(test_set_accuracy$review_scores_accuracy,predict(lm_full,test_set_accuracy))
+
+# training rmse = 0.4896081; testing rmse = 0.4779199
+# rank-deficient caused by the colinearity in the amenities dummy variables.
+# we extract distinct characters and count them. \
+
+
+#log lm reg[not selected]
+lm_log = lm(log(review_scores_accuracy+1)~.,data =training_set_accuracy)
+summary(lm_log) # reduce the r square
+par(mfrow=c(2,2))
+plot(lm_log)
+
+
+#decision tree
+par(mfrow=c(1,1))
+tree_rating<- tree (review_scores_accuracy~. , data=training_set_accuracy)
+summary(tree_rating)
+plot (tree_rating)
+text (tree_rating , pretty = 0)
+
+rmse(training_set_accuracy$review_scores_accuracy,predict (tree_rating ,newdata=training_set_accuracy)) 
+rmse (test_set_accuracy$review_scores_accuracy,predict (tree_rating , newdata =test_set_accuracy))
+
+# training set RMSE = 0.4975439; testing set RMSE=0.484337
+
+#pruning - Needed?
+# cv_results = cv.tree(tree_rating)
+# plot(cv_results$size,cv_results$dev,type="b")
+# indicesOrderedByDev = order(cv_results$dev,decreasing = FALSE)
+# indexForLowestDev = indicesOrderedByDev[1]
+# best_size = cv_results$size[indexForLowestDev] # k=4
+# more detailed subtrees
+
+cp.grid = expand.grid(.cp = (0:10)*0.001)
+tree_reg_accuracy = train(review_scores_accuracy~.,
+                          data = training_set_accuracy, method = 'rpart',
+                          trControl = trainControl(method = 'repeatedcv' , number = 10, repeats = 3),
+                          tuneGrid = cp.grid )
+tree_reg_accuracy
+best.tree.accuracy = tree_reg_accuracy$finalModel
+prp(best.tree.accuracy) # the best cp is  0.005
+
+rmse (training_set_accuracy$review_scores_accuracy,predict (best.tree.accuracy , newdata =training_set_accuracy)) 
+rmse (test_set_accuracy$review_scores_accuracy, predict (best.tree.accuracy , newdata =test_set_accuracy))
+
+# RMSE for test set = 0.4789592, RMSE for training set = 0.4903011;
+
+
+# ****** KNN Model *******
+tuneGrid = expand.grid(k = seq(1,59, by = 2))
+knn_reg_accuracy = train(review_scores_accuracy ~ host_is_superhost + calculated_host_listings_count +
+                           number_of_reviews + availability_90 +
+                           counts_amenities,
+                         data = training_set_accuracy, method = 'knn',
+                         preProcess = c('center','scale'),
+                         trControl = trainControl(method = 'repeatedcv' , number = 10, repeats = 3),
+                         tuneGrid = tuneGrid)
+
+knn_results_accuracy= knn_reg_accuracy$results
+knn_results_accuracy
+plot(knn_reg_accuracy)
+varImp(knn_reg_accuracy) 
+# Variables of importance -
+
+
+
+pred_knn_accuracy = predict(knn_reg_accuracy, newdata = test_set_accuracy)
+RMSE(pred_knn_accuracy,test_set_accuracy$review_scores_accuracy)
+# Test RMSE = 0.4885923 , Training RMSE = 0.5050278 (lowest for k = 59)
+
+
+# ********************************** PREDICTING CLEANLINESS REVIEWS **************************************
+
+training_set_cleanliness = training_set[,-c("host_location","host_neighbourhood",
+                                            "neighbourhood_cleansed","property_type",
+                                            "room_type","review_scores_accuracy",
+                                            "review_scores_communication","review_scores_location",
+                                            "review_scores_value","review_scores_checkin",
+                                            "review_scores_rating")]
+
+test_set_cleanliness = test_set[,-c("host_location","host_neighbourhood",
+                                    "neighbourhood_cleansed","property_type",
+                                    "room_type","review_scores_accuracy",
+                                    "review_scores_communication","review_scores_location",
+                                    "review_scores_value","review_scores_checkin",
+                                    "review_scores_rating")]
+
+hist(training_set_cleanliness$review_scores_cleanliness) # not normal distributed log doesn't work
+summary(training_set_cleanliness )
+training_set_cleanliness = training_set_cleanliness %>% mutate_if(sapply(training_set_cleanliness, is.factor), as.numeric)
+test_set_cleanliness = test_set_cleanliness %>% mutate_if(sapply(test_set_cleanliness, is.factor), as.numeric)
+
+# linear regression
+lm_full = lm(review_scores_cleanliness~.,data =training_set_cleanliness)
+summary(lm_full)
+# can explain 10% variance
+par(mfrow=c(2,2))
+plot(lm_full)# heavy tails residuals are not normally distributed
+
+rmse(training_set_cleanliness$review_scores_cleanliness,predict(lm_full,training_set_cleanliness))
+rmse(test_set_cleanliness$review_scores_cleanliness,predict(lm_full,test_set_cleanliness))
+
+# training rmse = 0.4978857; testing rmse = 0.4829659
+# rank-deficient caused by the colinearity in the amenities dummy variables.
+# we extract distinct characters and count them. \
+
+
+#log lm reg[not selected]
+lm_log = lm(log(review_scores_cleanliness+1)~.,data =training_set_cleanliness)
+summary(lm_log) # reduce the r square
+par(mfrow=c(2,2))
+plot(lm_log)
+
+
+#decision tree
+par(mfrow=c(1,1))
+tree_cleanliness<- tree (review_scores_cleanliness~. , data=training_set_cleanliness)
+summary(tree_cleanliness)
+plot (tree_cleanliness)
+text (tree_cleanliness , pretty = 0)
+
+rmse(training_set_cleanliness$review_scores_cleanliness,predict (tree_cleanliness ,newdata=training_set_cleanliness)) 
+rmse (test_set_cleanliness$review_scores_cleanliness,predict (tree_cleanliness , newdata =test_set_cleanliness))
+
+# training set rmse = 0.5079681;testing set rmse=0.4915408;
+
+#pruning - Needed?
+# cv_results = cv.tree(tree_cleanliness)
+# plot(cv_results$size,cv_results$dev,type="b")
+# indicesOrderedByDev = order(cv_results$dev,decreasing = FALSE)
+# indexForLowestDev = indicesOrderedByDev[1]
+# best_size = cv_results$size[indexForLowestDev] # k=4
+# more detailed subtrees
+
+cp.grid = expand.grid(.cp = (0:10)*0.001)
+tree_reg_cleanliness = train(review_scores_cleanliness~.,
+                             data = training_set_cleanliness, method = 'rpart',
+                             trControl = trainControl(method = 'repeatedcv' , number = 10, repeats = 3),
+                             tuneGrid = cp.grid )
+tree_reg_cleanliness
+best.tree.cleanliness = tree_reg_cleanliness$finalModel
+prp(best.tree.cleanliness) # the best cp is  0.004
+
+rmse (training_set_cleanliness$review_scores_cleanliness,predict (best.tree.cleanliness , newdata =training_set_cleanliness)) 
+rmse (test_set_cleanliness$review_scores_cleanliness, predict (best.tree.cleanliness , newdata =test_set_cleanliness))
+
+# RMSE for test set = 0.4823962, RMSE for training set = 0.4982808;
+
+
+# ****** KNN Model *******
+tuneGrid = expand.grid(k = seq(1,59, by = 2))
+knn_reg_cleanliness = train(review_scores_cleanliness ~ host_is_superhost + calculated_host_listings_count +
+                              number_of_reviews + availability_90 +
+                              counts_amenities,
+                            data = training_set_cleanliness, method = 'knn',
+                            preProcess = c('center','scale'),
+                            trControl = trainControl(method = 'repeatedcv' , number = 10, repeats = 3),
+                            tuneGrid = tuneGrid)
+
+knn_results_cleanliness= knn_reg_cleanliness$results
+knn_results_cleanliness
+plot(knn_reg_cleanliness)
+varImp(knn_reg_cleanliness) 
+# Variables of importance -
+# host_is_superhost              100.000
+# counts_amenities                53.404
+# availability_90                  8.962
+# calculated_host_listings_count   6.485
+# number_of_reviews                0.000
+
+
+pred_knn_cleanliness = predict(knn_reg_cleanliness, newdata = test_set_cleanliness)
+RMSE(pred_knn_cleanliness,test_set_cleanliness$review_scores_cleanliness)
+# Test RMSE = 0.4885923 , Training RMSE = 0.5050278 (lowest for k = 59)
+
+
+
+# ********************************** PREDICTING VALUE REVIEWS ********************************************
+
+training_set_value = training_set[,-c("host_location","host_neighbourhood",
+                                      "neighbourhood_cleansed","property_type",
+                                      "room_type","review_scores_accuracy",
+                                      "review_scores_communication","review_scores_location",
+                                      "review_scores_value","review_scores_checkin",
+                                      "review_scores_value")]
+
+test_set_value = test_set[,-c("host_location","host_neighbourhood",
+                              "neighbourhood_cleansed","property_type",
+                              "room_type","review_scores_accuracy",
+                              "review_scores_communication","review_scores_location",
+                              "review_scores_value","review_scores_checkin",
+                              "review_scores_value")]
+
+hist(training_set_value$review_scores_value) # not normal distributed log doesn't work
+summary(training_set_value )
+training_set_value = training_set_value %>% mutate_if(sapply(training_set_value, is.factor), as.numeric)
+test_set_value = test_set_value %>% mutate_if(sapply(test_set_value, is.factor), as.numeric)
+
+# linear regression
+lm_full = lm(review_scores_value~.,data =training_set_value)
+summary(lm_full)
+# can explain 10% variance
+par(mfrow=c(2,2))
+plot(lm_full)# heavy tails residuals are not normally distributed
+
+rmse(training_set_value$review_scores_value,predict(lm_full,training_set_value))
+rmse(test_set_value$review_scores_value,predict(lm_full,test_set_value))
+
+# training rmse = 0.4978857; testing rmse = 0.4829659
+# rank-deficient caused by the colinearity in the amenities dummy variables.
+# we extract distinct characters and count them. \
+
+
+#log lm reg[not selected]
+lm_log = lm(log(review_scores_value+1)~.,data =training_set_value)
+summary(lm_log) # reduce the r square
+par(mfrow=c(2,2))
+plot(lm_log)
+
+
+#decision tree
+par(mfrow=c(1,1))
+tree_value<- tree (review_scores_value~. , data=training_set_value)
+summary(tree_value)
+plot (tree_value)
+text (tree_value , pretty = 0)
+
+rmse(training_set_value$review_scores_value,predict (tree_value ,newdata=training_set_value)) 
+rmse (test_set_value$review_scores_value,predict (tree_value , newdata =test_set_value))
+
+# training set rmse = 0.5079681;testing set rmse=0.4915408;
+
+#pruning - Needed?
+# cv_results = cv.tree(tree_value)
+# plot(cv_results$size,cv_results$dev,type="b")
+# indicesOrderedByDev = order(cv_results$dev,decreasing = FALSE)
+# indexForLowestDev = indicesOrderedByDev[1]
+# best_size = cv_results$size[indexForLowestDev] # k=4
+# more detailed subtrees
+
+cp.grid = expand.grid(.cp = (0:10)*0.001)
+tree_reg_value = train(review_scores_value~.,
+                       data = training_set_value, method = 'rpart',
+                       trControl = trainControl(method = 'repeatedcv' , number = 10, repeats = 3),
+                       tuneGrid = cp.grid )
+tree_reg_value
+best.tree.value = tree_reg_value$finalModel
+prp(best.tree.value) # the best cp is  0.004
+
+rmse (training_set_value$review_scores_value,predict (best.tree.value , newdata =training_set_value)) 
+rmse (test_set_value$review_scores_value, predict (best.tree.value , newdata =test_set_value))
+
+# RMSE for test set = 0.4823962, RMSE for training set = 0.4982808;
+
+
+# ****** KNN Model *******
+tuneGrid = expand.grid(k = seq(1,59, by = 2))
+knn_reg_value = train(review_scores_value ~ host_is_superhost + calculated_host_listings_count +
+                        number_of_reviews + availability_90 +
+                        counts_amenities,
+                      data = training_set_value, method = 'knn',
+                      preProcess = c('center','scale'),
+                      trControl = trainControl(method = 'repeatedcv' , number = 10, repeats = 3),
+                      tuneGrid = tuneGrid)
+
+knn_results_value= knn_reg_value$results
+knn_results_value
+plot(knn_reg_value)
+varImp(knn_reg_value) 
+# Variables of importance -
+# host_is_superhost              100.000
+# counts_amenities                53.404
+# availability_90                  8.962
+# calculated_host_listings_count   6.485
+# number_of_reviews                0.000
+
+
+pred_knn_value = predict(knn_reg_value, newdata = test_set_value)
+RMSE(pred_knn_value,test_set_value$review_scores_value)
+# Test RMSE = 0.4885923 , Training RMSE = 0.5050278 (lowest for k = 59)
+
+
+# *************************************** END OF PROJECT ***************************************
