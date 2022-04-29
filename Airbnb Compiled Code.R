@@ -742,6 +742,58 @@ plot(lm_full)# heavy tails residuals are not normally distributed
 rmse(training_set_communication1$review_scores_communication,predict(lm_full,training_set_communication1))
 rmse(test_set_communication1$review_scores_communication,predict(lm_full,test_set_communication1))
 
+                                        
+## RANDOM FOREST REGRESSION
+
+set.seed(1)
+
+rf_exclude_from_train = c("review_scores_rating","review_scores_accuracy","review_scores_cleanliness","review_scores_checkin","review_scores_location","review_scores_value")
+rf_comm = randomForest(review_scores_communication ~. , data = training_set_rf |> select(-rf_exclude_from_train), sampsize=5000)
+
+rf_comm
+plot(rf_comm$mse,xlab = "tree count", ylab = "mse")
+
+test_predictions_rf_comm = predict(rf_comm,test_set_rf[,-c("review_scores_communication")])
+test_predictions_rf_comm = unname(test_predictions_rf_comm)
+
+# train rmse = 0.3909063
+training_predictions_rf_comm = predict(rf_comm,training_set_rf[,-c("review_scores_communication")])
+training_predictions_rf_comm = unname(training_predictions_rf_comm)
+rmse(training_set_rf$review_scores_communication,training_predictions_rf_comm)
+
+# test rmse = 0.429769
+rmse(test_set_rf$review_scores_communication,test_predictions_rf_comm)
+#importance(rf_comm)
+
+## BAGGING MODEL
+rf_bagging_comm = randomForest(review_scores_communication ~. , data = training_set_rf |> select(-rf_exclude_from_train), sampsize=5000, mtry=(ncol(training_set_rf)-1)) 
+rf_bagging_comm
+test_predictions_bag_comm = predict(rf_bagging_comm,test_set_rf[,-c("review_scores_communication")])
+test_predictions_bag_comm = unname(test_predictions_bag_comm)
+# test rmse = 0.4327798
+rmse(test_set_rf$review_scores_communication,test_predictions_bag_comm)
+
+training_predictions_bag_comm = predict(rf_bagging_comm,training_set_rf[,-c("review_scores_communication")])
+training_predictions_bag_comm = unname(training_predictions_bag_comm)
+# training rmse = 0.3899329
+rmse(training_set_rf$review_scores_communication,training_predictions_bag_comm)
+
+## Boosting Model 
+set.seed(1)
+
+#train fraction for validation
+boost_comm = gbm(review_scores_communication ~. , data = training_set_rf |> select(-rf_exclude_from_train),train.fraction=0.8, distribution="gaussian", n.trees=125, interaction.depth=3)
+yhat_boost_comm = predict(boost_comm, test_set_rf[,-c("review_scores_communication")], n.trees=125)
+# test rmse = 0.4350429
+rmse(test_set_rf$review_scores_communication,yhat_boost_comm)
+plot(boost_comm$train.error,xlab = "tree count", ylab = "loss")
+plot(boost_comm$valid.error,xlab = "tree count", ylab = "validation loss")
+
+training_yhat_boost_comm = predict(boost_comm, training_set_rf[,-c("review_scores_communication")], n.trees=125)
+# training rmse = 0.4311334
+rmse(training_set_rf$review_scores_communication,training_yhat_boost_comm)
+                                        
+                                        
 
 # ********************************** PREDICTING CHECKIN REVIEWS ***********************************
 ##clean data for check in score
