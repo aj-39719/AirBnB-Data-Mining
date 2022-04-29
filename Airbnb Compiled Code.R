@@ -600,14 +600,17 @@ RMSE(pred_knn_loc,test_set_location$review_scores_location)
 
 set.seed(1)
 
+# create a copy of the dataset for Random forest without columns with too many factors, as this prevent RF from running                                       
 training_set_rf = subset(training_set, select = -c(host_location,host_neighbourhood, property_type))
 test_set_rf = subset(test_set, select = -c(host_location,host_neighbourhood, property_type))
-
+                                        
+# I don't include the scores for other categories in the training
 rf_exclude_from_train = c("review_scores_rating","review_scores_accuracy","review_scores_cleanliness","review_scores_checkin","review_scores_communication","review_scores_value")
+# train the random forest                                        
 rf_loc = randomForest(review_scores_location ~. , data = training_set_rf |> select(-rf_exclude_from_train), sampsize=5000)
 
-rf_loc
-plot(rf_loc$mse,xlab = "tree count", ylab = "mse")
+rf_loc #not too much variation is explained by the model
+plot(rf_loc$mse,xlab = "tree count", ylab = "mse")# mse is minimized way before the 5000th tree
 
 #names(which(colSums(is.na(test_set_rf)) > 0))
 
@@ -619,6 +622,7 @@ rmse(test_set_rf$review_scores_location,test_predictions_rf_loc)
 #importance(rf_comm)
 
 ## BAGGING MODEL
+# same as random forest but uses all of the columns per iteration                                        
 rf_bagging_loc = randomForest(review_scores_location ~. , data = training_set_rf |> select(-rf_exclude_from_train), sampsize=5000, mtry=(ncol(training_set_rf)-1)) 
 rf_bagging_loc
 test_predictions_bag_loc = predict(rf_bagging_loc,test_set_rf[,-c("review_scores_location")])
@@ -629,12 +633,14 @@ rmse(test_set_rf$review_scores_location,test_predictions_bag_loc)
 ## Boosting Model 
 set.seed(1)
 
-#train fraction for validation
+# 80% of the data is used for training and 20% is set aside for validation which allowed me
+# to check the best number of trees and tree depth for the boosting model                                        
 boost_loc = gbm(review_scores_location ~. , data = training_set_rf |> select(-rf_exclude_from_train),train.fraction=0.8, distribution="gaussian", n.trees=180, interaction.depth=3)
 yhat_boost_loc = predict(boost_loc, test_set_rf[,-c("review_scores_location")], n.trees=180)
 # rmse = 0.415215
 rmse(test_set_rf$review_scores_location,yhat_boost_loc)
 plot(boost_loc$train.error,xlab = "tree count", ylab = "loss")
+# I plot the valid error to see when overfitting starts
 plot(boost_loc$valid.error,xlab = "tree count", ylab = "validation loss")
 
 # ********************************** PREDICTING COMMUNICATION REVIEWS ***********************************
