@@ -1105,14 +1105,14 @@ training_set_value = training_set[,-c("host_location","host_neighbourhood",
                                       "room_type","review_scores_accuracy",
                                       "review_scores_communication","review_scores_location",
                                       "review_scores_value","review_scores_checkin",
-                                      "review_scores_value")]
+                                      "review_scores_rating")]
 
 test_set_value = test_set[,-c("host_location","host_neighbourhood",
                               "neighbourhood_cleansed","property_type",
                               "room_type","review_scores_accuracy",
                               "review_scores_communication","review_scores_location",
                               "review_scores_value","review_scores_checkin",
-                              "review_scores_value")]
+                              "review_scores_rating")]
 
 hist(training_set_value$review_scores_value) # not normal distributed log doesn't work
 summary(training_set_value )
