@@ -623,7 +623,8 @@ rmse(training_set$review_scores_location,predict(svmfit3,training_set[,1:2]))
 rmse(test_set$review_scores_location,predict(svmfit3,test_set[,1:2]))
 # testing set RMSE =  0.4199995 # training set RMSE = 0.4537708
 
-## KNN REGRESSION
+
+# KNN REGRESSION
 
 tuneGrid = expand.grid(k = seq(1,59, by = 2))
 
@@ -641,7 +642,7 @@ varImp(knn_reg) #it is taking longitude to be the most important variable of imp
 
 pred_knn = predict(knn_reg, newdata = test_set)
 RMSE(pred_knn,test_set$review_scores_location)
-# Test RMSE = 0.3891 ; Training RMSE = 0.4224938 
+# Test RMSE = 0.4201638 ; Training RMSE = 0.4088177
 
 
 
@@ -659,14 +660,44 @@ colSums(is.na(airbnb_communication)) # no missing value
 
 
 # ***** Decision Tree Model ******
+tree_communication <- tree(review_scores_communication ~ . -review_scores_rating                       
+                      -review_scores_accuracy                    
+                      -review_scores_cleanliness      
+                      -review_scores_checkin                      
+                      -review_scores_communication             
+                      -review_scores_location  
+                      -review_scores_value
+                      , data=training_set)
+summary(tree_communication)
+plot (tree_communication)
+text (tree_communication , pretty = 0)
 
-tree_model = tree(review_scores_communication ~. , data = training_set)
-tree_model
-plot(tree_model)
-text(tree_model, pretty = 0)
+pred_comm_tree = predict(tree_communication, newdata = test_set)
+RMSE(pred_comm_tree,test_set$review_scores_communication)
+# Test RMSE = 0.4422002
 
-tree_pred = predict(tree_model, test_set)
-mean((tree_pred - test_set$review_scores_communication)^2) # Test MSE = 0.0839 and RMSE = 0.2897
+
+
+# Cross-validation to choose the best tree
+cp.grid = expand.grid(.cp = (0:10)*0.001)
+tree_reg = train(review_scores_communication ~ . -review_scores_rating                       
+                 -review_scores_accuracy                    
+                 -review_scores_cleanliness      
+                 -review_scores_checkin                      
+                 -review_scores_communication             
+                 -review_scores_location  
+                 -review_scores_value,
+                 data = training_set, method = 'rpart',
+                 trControl = trainControl(method = 'repeatedcv' , number = 10, repeats = 3),
+                 tuneGrid = cp.grid )
+tree_reg 
+best.tree = tree_reg$finalModel
+
+prp(best.tree) # the best cp is 0.001                
+mean ((predict (best.tree , newdata =training_set) - training_set$review_scores_location)^2) 
+mean ((predict (best.tree , newdata =test_set) - test_set$review_scores_location)^2)  
+#  training data: MSE = 0.1781331; RMSE = 0.4220582 ;testing data: MSE = 0.1378898; RMSE = 0.3713352
+
 
 
 # ****** KNN Model *******
@@ -802,3 +833,21 @@ svmfit2 = svm(review_scores_checkin~. ,data=training_set1, kernel="linear" ,scal
 rmse(training_set1$review_scores_checkin,predict(svmfit2,training_set1))
 # testing set rmse = 0.4731245
 rmse(test_set1$review_scores_checkin,predict(svmfit2,test_set1))
+
+
+# *********************************** PREDICTING RATING REVIEWS **********************************
+
+
+
+
+# ********************************** PREDICTING ACCURACY REVIEWS *********************************
+
+
+
+
+# ********************************** PREDICTING VALUE REVIEWS ************************************
+
+
+
+
+# ********************************** PREDICTING CLEANLINESS REVIEWS ***********************************
