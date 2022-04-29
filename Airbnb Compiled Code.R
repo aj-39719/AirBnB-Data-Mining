@@ -617,7 +617,12 @@ plot(rf_loc$mse,xlab = "tree count", ylab = "mse")# mse is minimized way before 
 test_predictions_rf_loc = predict(rf_loc,test_set_rf[,-c("review_scores_location")])
 test_predictions_rf_loc = unname(test_predictions_rf_loc)
 
-# rmse = 0.4121174
+# train rmse = 0.3551543
+training_predictions_rf_loc = predict(rf_loc,training_set_rf[,-c("review_scores_location")])
+training_predictions_rf_loc = unname(training_predictions_rf_loc)
+rmse(training_set_rf$review_scores_location,training_predictions_rf_loc)
+
+# test rmse = 0.4121174
 rmse(test_set_rf$review_scores_location,test_predictions_rf_loc)
 #importance(rf_comm)
 
@@ -627,7 +632,13 @@ rf_bagging_loc = randomForest(review_scores_location ~. , data = training_set_rf
 rf_bagging_loc
 test_predictions_bag_loc = predict(rf_bagging_loc,test_set_rf[,-c("review_scores_location")])
 test_predictions_bag_loc = unname(test_predictions_bag_loc)
-# rmse = 0.4136218
+
+training_predictions_bag_loc = predict(rf_bagging_loc,training_set_rf[,-c("review_scores_location")])
+training_predictions_bag_loc = unname(training_predictions_bag_loc)
+# training rmse = 0.3531969
+rmse(training_set_rf$review_scores_location,training_predictions_bag_loc)
+
+# test rmse = 0.4136218
 rmse(test_set_rf$review_scores_location,test_predictions_bag_loc)
 
 ## Boosting Model 
@@ -637,11 +648,15 @@ set.seed(1)
 # to check the best number of trees and tree depth for the boosting model                                        
 boost_loc = gbm(review_scores_location ~. , data = training_set_rf |> select(-rf_exclude_from_train),train.fraction=0.8, distribution="gaussian", n.trees=180, interaction.depth=3)
 yhat_boost_loc = predict(boost_loc, test_set_rf[,-c("review_scores_location")], n.trees=180)
-# rmse = 0.415215
+# test rmse = 0.415215
 rmse(test_set_rf$review_scores_location,yhat_boost_loc)
 plot(boost_loc$train.error,xlab = "tree count", ylab = "loss")
 # I plot the valid error to see when overfitting starts
 plot(boost_loc$valid.error,xlab = "tree count", ylab = "validation loss")
+                                        
+training_yhat_boost_loc = predict(boost_loc, training_set_rf[,-c("review_scores_location")], n.trees=180)
+# training rmse = 0.3892829
+rmse(training_set_rf$review_scores_location,training_yhat_boost_loc)
 
 # ********************************** PREDICTING COMMUNICATION REVIEWS ***********************************
 
