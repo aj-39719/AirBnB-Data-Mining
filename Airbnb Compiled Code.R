@@ -595,15 +595,15 @@ pred_knn_loc = predict(knn_reg_loc, newdata = test_set_location)
 RMSE(pred_knn_loc,test_set_location$review_scores_location)
 # Test RMSE =0.4201638  
 
-                                        
+
 ## RANDOM FOREST REGRESSION
 
 set.seed(1)
 
-# create a copy of the dataset for Random forest without columns with too many factors, as this prevent RF from running                                       
+# create a copy of the dataset for Random forest without columns with too many factors, as this prevent RF from running   
 training_set_rf = subset(training_set, select = -c(host_location,host_neighbourhood, property_type))
 test_set_rf = subset(test_set, select = -c(host_location,host_neighbourhood, property_type))
-                                        
+
 # I don't include the scores for other categories in the training
 rf_exclude_from_train = c("review_scores_rating","review_scores_accuracy","review_scores_cleanliness","review_scores_checkin","review_scores_communication","review_scores_value")
 # train the random forest                                        
@@ -627,7 +627,7 @@ rmse(test_set_rf$review_scores_location,test_predictions_rf_loc)
 #importance(rf_comm)
 
 ## BAGGING MODEL
-# same as random forest but uses all of the columns per iteration                                        
+  
 rf_bagging_loc = randomForest(review_scores_location ~. , data = training_set_rf |> select(-rf_exclude_from_train), sampsize=5000, mtry=(ncol(training_set_rf)-1)) 
 rf_bagging_loc
 test_predictions_bag_loc = predict(rf_bagging_loc,test_set_rf[,-c("review_scores_location")])
@@ -645,7 +645,7 @@ rmse(test_set_rf$review_scores_location,test_predictions_bag_loc)
 set.seed(1)
 
 # 80% of the data is used for training and 20% is set aside for validation which allowed me
-# to check the best number of trees and tree depth for the boosting model                                        
+# to check the best number of trees and tree depth for the boosting model 
 boost_loc = gbm(review_scores_location ~. , data = training_set_rf |> select(-rf_exclude_from_train),train.fraction=0.8, distribution="gaussian", n.trees=180, interaction.depth=3)
 yhat_boost_loc = predict(boost_loc, test_set_rf[,-c("review_scores_location")], n.trees=180)
 # test rmse = 0.415215
@@ -653,7 +653,7 @@ rmse(test_set_rf$review_scores_location,yhat_boost_loc)
 plot(boost_loc$train.error,xlab = "tree count", ylab = "loss")
 # I plot the valid error to see when overfitting starts
 plot(boost_loc$valid.error,xlab = "tree count", ylab = "validation loss")
-                                        
+
 training_yhat_boost_loc = predict(boost_loc, training_set_rf[,-c("review_scores_location")], n.trees=180)
 # training rmse = 0.3892829
 rmse(training_set_rf$review_scores_location,training_yhat_boost_loc)
@@ -742,7 +742,7 @@ plot(lm_full)# heavy tails residuals are not normally distributed
 rmse(training_set_communication1$review_scores_communication,predict(lm_full,training_set_communication1))
 rmse(test_set_communication1$review_scores_communication,predict(lm_full,test_set_communication1))
 
-                                        
+
 ## RANDOM FOREST REGRESSION
 
 set.seed(1)
@@ -792,8 +792,8 @@ plot(boost_comm$valid.error,xlab = "tree count", ylab = "validation loss")
 training_yhat_boost_comm = predict(boost_comm, training_set_rf[,-c("review_scores_communication")], n.trees=125)
 # training rmse = 0.4311334
 rmse(training_set_rf$review_scores_communication,training_yhat_boost_comm)
-                                        
-                                        
+
+
 
 # ********************************** PREDICTING CHECKIN REVIEWS ***********************************
 ##clean data for check in score
@@ -1102,12 +1102,17 @@ knn_results_accuracy
 plot(knn_reg_accuracy)
 varImp(knn_reg_accuracy) 
 # Variables of importance -
+# host_is_superhost               100.00
+# availability_90                  41.04
+# counts_amenities                 40.28
+# number_of_reviews                 7.52
+# calculated_host_listings_count    0.00
 
 
 
 pred_knn_accuracy = predict(knn_reg_accuracy, newdata = test_set_accuracy)
 RMSE(pred_knn_accuracy,test_set_accuracy$review_scores_accuracy)
-# Test RMSE = 0.4885923 , Training RMSE = 0.5050278 (lowest for k = 59)
+# Test RMSE = 0.4804112 , Training RMSE = 0.4934026   (lowest for k = 59)
 
 
 # ********************************** PREDICTING CLEANLINESS REVIEWS **************************************
@@ -1163,15 +1168,7 @@ text (tree_cleanliness , pretty = 0)
 rmse(training_set_cleanliness$review_scores_cleanliness,predict (tree_cleanliness ,newdata=training_set_cleanliness)) 
 rmse (test_set_cleanliness$review_scores_cleanliness,predict (tree_cleanliness , newdata =test_set_cleanliness))
 
-# training set rmse = 0.5079681;testing set rmse=0.4915408;
-
-#pruning - Needed?
-# cv_results = cv.tree(tree_cleanliness)
-# plot(cv_results$size,cv_results$dev,type="b")
-# indicesOrderedByDev = order(cv_results$dev,decreasing = FALSE)
-# indexForLowestDev = indicesOrderedByDev[1]
-# best_size = cv_results$size[indexForLowestDev] # k=4
-# more detailed subtrees
+# training set rmse = 0.5789061;testing set rmse=0.5543228;
 
 cp.grid = expand.grid(.cp = (0:10)*0.001)
 tree_reg_cleanliness = train(review_scores_cleanliness~.,
@@ -1185,13 +1182,13 @@ prp(best.tree.cleanliness) # the best cp is  0.004
 rmse (training_set_cleanliness$review_scores_cleanliness,predict (best.tree.cleanliness , newdata =training_set_cleanliness)) 
 rmse (test_set_cleanliness$review_scores_cleanliness, predict (best.tree.cleanliness , newdata =test_set_cleanliness))
 
-# RMSE for test set = 0.4823962, RMSE for training set = 0.4982808;
+# RMSE for test set = 0.5474485, RMSE for training set = 0.567065;
 
 
 # ****** KNN Model *******
 tuneGrid = expand.grid(k = seq(1,59, by = 2))
-knn_reg_cleanliness = train(review_scores_cleanliness ~ host_is_superhost + calculated_host_listings_count +
-                              number_of_reviews + availability_90 +
+knn_reg_cleanliness = train(review_scores_cleanliness ~ host_is_superhost  +
+                              number_of_reviews + availability_90  +
                               counts_amenities,
                             data = training_set_cleanliness, method = 'knn',
                             preProcess = c('center','scale'),
@@ -1202,17 +1199,15 @@ knn_results_cleanliness= knn_reg_cleanliness$results
 knn_results_cleanliness
 plot(knn_reg_cleanliness)
 varImp(knn_reg_cleanliness) 
-# Variables of importance -
-# host_is_superhost              100.000
-# counts_amenities                53.404
-# availability_90                  8.962
-# calculated_host_listings_count   6.485
-# number_of_reviews                0.000
+# host_is_superhost  100.00
+# counts_amenities    90.18
+# number_of_reviews   29.45
+# availability_90      0.00
 
 
 pred_knn_cleanliness = predict(knn_reg_cleanliness, newdata = test_set_cleanliness)
 RMSE(pred_knn_cleanliness,test_set_cleanliness$review_scores_cleanliness)
-# Test RMSE = 0.4885923 , Training RMSE = 0.5050278 (lowest for k = 59)
+# Test RMSE = 0.5509493 , Training RMSE = 0.5740209 (lowest for k = 59)
 
 
 
@@ -1222,14 +1217,14 @@ training_set_value = training_set[,-c("host_location","host_neighbourhood",
                                       "neighbourhood_cleansed","property_type",
                                       "room_type","review_scores_accuracy",
                                       "review_scores_communication","review_scores_location",
-                                      "review_scores_value","review_scores_checkin",
+                                      "review_scores_cleanliness","review_scores_checkin",
                                       "review_scores_rating")]
 
 test_set_value = test_set[,-c("host_location","host_neighbourhood",
                               "neighbourhood_cleansed","property_type",
                               "room_type","review_scores_accuracy",
                               "review_scores_communication","review_scores_location",
-                              "review_scores_value","review_scores_checkin",
+                              "review_scores_cleanliness","review_scores_checkin",
                               "review_scores_rating")]
 
 hist(training_set_value$review_scores_value) # not normal distributed log doesn't work
@@ -1269,7 +1264,7 @@ text (tree_value , pretty = 0)
 rmse(training_set_value$review_scores_value,predict (tree_value ,newdata=training_set_value)) 
 rmse (test_set_value$review_scores_value,predict (tree_value , newdata =test_set_value))
 
-# training set rmse = 0.5079681;testing set rmse=0.4915408;
+# training set rmse = 0.5111782;testing set rmse=0.4932357;
 
 #pruning - Needed?
 # cv_results = cv.tree(tree_value)
@@ -1286,19 +1281,19 @@ tree_reg_value = train(review_scores_value~.,
                        tuneGrid = cp.grid )
 tree_reg_value
 best.tree.value = tree_reg_value$finalModel
-prp(best.tree.value) # the best cp is  0.004
+prp(best.tree.value) # the best cp is  0.003
 
 rmse (training_set_value$review_scores_value,predict (best.tree.value , newdata =training_set_value)) 
 rmse (test_set_value$review_scores_value, predict (best.tree.value , newdata =test_set_value))
 
-# RMSE for test set = 0.4823962, RMSE for training set = 0.4982808;
+# RMSE for test set = 0.4868288, RMSE for training set = 0.4989342;
 
 
 # ****** KNN Model *******
 tuneGrid = expand.grid(k = seq(1,59, by = 2))
 knn_reg_value = train(review_scores_value ~ host_is_superhost + calculated_host_listings_count +
                         number_of_reviews + availability_90 +
-                        counts_amenities,
+                        join_time,
                       data = training_set_value, method = 'knn',
                       preProcess = c('center','scale'),
                       trControl = trainControl(method = 'repeatedcv' , number = 10, repeats = 3),
@@ -1309,16 +1304,16 @@ knn_results_value
 plot(knn_reg_value)
 varImp(knn_reg_value) 
 # Variables of importance -
-# host_is_superhost              100.000
-# counts_amenities                53.404
-# availability_90                  8.962
-# calculated_host_listings_count   6.485
-# number_of_reviews                0.000
+# host_is_superhost               100.00
+# join_time                        50.77
+# availability_90                  32.90
+# calculated_host_listings_count   23.84
+# number_of_reviews                 0.00
 
 
 pred_knn_value = predict(knn_reg_value, newdata = test_set_value)
 RMSE(pred_knn_value,test_set_value$review_scores_value)
-# Test RMSE = 0.4885923 , Training RMSE = 0.5050278 (lowest for k = 59)
+# Test RMSE = 0.4914534 , Training RMSE = 0.5063392  (lowest for k = 59)
 
 
 # *************************************** END OF PROJECT ***************************************
