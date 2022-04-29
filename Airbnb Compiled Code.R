@@ -1218,6 +1218,58 @@ pred_knn_accuracy = predict(knn_reg_accuracy, newdata = test_set_accuracy)
 RMSE(pred_knn_accuracy,test_set_accuracy$review_scores_accuracy)
 # Test RMSE = 0.4804112 , Training RMSE = 0.4934026   (lowest for k = 59)
 
+                                        
+                                        
+## RANDOM FOREST REGRESSION
+
+set.seed(1)
+
+rf_exclude_from_train = c("review_scores_checkin","review_scores_rating","review_scores_cleanliness","review_scores_communication","review_scores_location","review_scores_value")
+rf_acc = randomForest(review_scores_accuracy ~. , data = training_set_rf |> select(-rf_exclude_from_train), sampsize=5000)
+
+rf_acc
+plot(rf_acc$mse,xlab = "tree count", ylab = "mse")
+
+test_predictions_rf_acc = predict(rf_acc,test_set_rf[,-c("review_scores_accuracy")])
+test_predictions_rf_acc = unname(test_predictions_rf_acc)
+
+# train rmse = 0.4236486
+training_predictions_rf_acc = predict(rf_acc,training_set_rf[,-c("review_scores_accuracy")])
+training_predictions_rf_acc = unname(training_predictions_rf_acc)
+rmse(training_set_rf$review_scores_accuracy,training_predictions_rf_acc)
+
+# test rmse = 0.4677659
+rmse(test_set_rf$review_scores_accuracy,test_predictions_rf_acc)
+
+## BAGGING MODEL
+rf_bagging_acc = randomForest(review_scores_accuracy ~. , data = training_set_rf |> select(-rf_exclude_from_train), sampsize=5000, mtry=(ncol(training_set_rf)-1)) 
+rf_bagging_acc
+test_predictions_bag_acc = predict(rf_bagging_acc,test_set_rf[,-c("review_scores_accuracy")])
+test_predictions_bag_acc = unname(test_predictions_bag_acc)
+# test rmse = 0.4713055
+rmse(test_set_rf$review_scores_accuracy,test_predictions_bag_acc)
+
+training_predictions_bag_acc = predict(rf_bagging_acc,training_set_rf[,-c("review_scores_accuracy")])
+training_predictions_bag_acc = unname(training_predictions_bag_acc)
+# training rmse = 0.422297
+rmse(training_set_rf$review_scores_accuracy,training_predictions_bag_acc)
+
+## Boosting Model 
+set.seed(1)
+
+#train fraction for validation
+boost_acc = gbm(review_scores_accuracy ~. , data = training_set_rf |> select(-rf_exclude_from_train),train.fraction=0.8, distribution="gaussian", n.trees=125, interaction.depth=3)
+yhat_boost_acc = predict(boost_acc, test_set_rf[,-c("review_scores_accuracy")], n.trees=125)
+# test rmse = 0.4708122
+rmse(test_set_rf$review_scores_accuracy,yhat_boost_acc)
+plot(boost_acc$train.error,xlab = "tree count", ylab = "loss")
+plot(boost_acc$valid.error,xlab = "tree count", ylab = "validation loss")
+
+training_yhat_boost_acc = predict(boost_acc, training_set_rf[,-c("review_scores_accuracy")], n.trees=125)
+# training rmse = 0.4701923
+rmse(training_set_rf$review_scores_accuracy,training_yhat_boost_acc)
+                                        
+
 
 # ********************************** PREDICTING CLEANLINESS REVIEWS **************************************
 
