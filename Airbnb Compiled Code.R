@@ -1060,6 +1060,58 @@ RMSE(pred_knn_rating,test_set_rating$review_scores_rating)
 # Test RMSE = 0.4885923 , Training RMSE = 0.5050278 (lowest for k = 59)
 
 
+                                        
+## RANDOM FOREST REGRESSION
+
+set.seed(1)
+
+rf_exclude_from_train = c("review_scores_checkin","review_scores_accuracy","review_scores_cleanliness","review_scores_communication","review_scores_location","review_scores_value")
+rf_rate = randomForest(review_scores_rating ~. , data = training_set_rf |> select(-rf_exclude_from_train), sampsize=5000)
+
+rf_rate
+plot(rf_rate$mse,xlab = "tree count", ylab = "mse")
+
+test_predictions_rf_rate = predict(rf_rate,test_set_rf[,-c("review_scores_rating")])
+test_predictions_rf_rate = unname(test_predictions_rf_rate)
+
+# train rmse = 0.4281337
+training_predictions_rf_rate = predict(rf_rate,training_set_rf[,-c("review_scores_rating")])
+training_predictions_rf_rate = unname(training_predictions_rf_rate)
+rmse(training_set_rf$review_scores_rating,training_predictions_rf_rate)
+
+# test rmse = 0.4699481
+rmse(test_set_rf$review_scores_rating,test_predictions_rf_rate)
+
+## BAGGING MODEL
+rf_bagging_rate = randomForest(review_scores_rating ~. , data = training_set_rf |> select(-rf_exclude_from_train), sampsize=5000, mtry=(ncol(training_set_rf)-1)) 
+rf_bagging_rate
+test_predictions_bag_rate = predict(rf_bagging_rate,test_set_rf[,-c("review_scores_rating")])
+test_predictions_bag_rate = unname(test_predictions_bag_rate)
+# test rmse = 0.472905
+rmse(test_set_rf$review_scores_rating,test_predictions_bag_rate)
+
+training_predictions_bag_rate = predict(rf_bagging_rate,training_set_rf[,-c("review_scores_rating")])
+training_predictions_bag_rate = unname(training_predictions_bag_rate)
+# training rmse = 0.4273666
+rmse(training_set_rf$review_scores_rating,training_predictions_bag_rate)
+
+## Boosting Model 
+set.seed(1)
+
+#train fraction for validation
+boost_rate = gbm(review_scores_rating ~. , data = training_set_rf |> select(-rf_exclude_from_train),train.fraction=0.8, distribution="gaussian", n.trees=100, interaction.depth=3)
+yhat_boost_rate = predict(boost_rate, test_set_rf[,-c("review_scores_rating")], n.trees=100)
+# test rmse = 0.4749752
+rmse(test_set_rf$review_scores_rating,yhat_boost_rate)
+plot(boost_rate$train.error,xlab = "tree count", ylab = "loss")
+plot(boost_rate$valid.error,xlab = "tree count", ylab = "validation loss")
+
+training_yhat_boost_rate = predict(boost_rate, training_set_rf[,-c("review_scores_rating")], n.trees=100)
+# training rmse = 0.481037
+rmse(training_set_rf$review_scores_rating,training_yhat_boost_rate)
+                                        
+                                        
+
 
 # ********************************** PREDICTING ACCURACY REVIEWS *****************************************
 
