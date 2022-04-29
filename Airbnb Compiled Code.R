@@ -8,9 +8,17 @@
 #install.packages("e1071")
 #install.packages("leaps")
 #install.packages("ModelMetrics")
-# install.packages("polywog")
-# install.packages("rpart.plot")
+#install.packages("polywog")
+#install.packages("rpart.plot")
 #install.packages("kernlab")
+#install.packages("ggthemes")
+#install.packages("RColorBrewer")
+#install.packages("ggridges")
+#install.packages("cowplot")
+library(RColorBrewer)
+library(ggridges)
+library(cowplot)
+library(ggthemes)
 library(kernlab)
 library(BBmisc)
 library(data.table)
@@ -25,7 +33,7 @@ library(rpart.plot)
 library(e1071)
 
 path = '/Users/admin/Downloads/listings.csv'
-#airbnb = fread(input = "listings.csv")
+airbnb = fread(input = "listings.csv")
 airbnb = fread(input = path)
 
 # Check the structure of the table
@@ -180,15 +188,15 @@ c
 #  ****** Average Price per Room Type ******
 
 #Removing currency symbol
-airbnb$price = as.numeric(gsub("\\$", "", airbnb$price)) 
+airbnb$price_calc = as.numeric(gsub("\\$", "", airbnb$price)) 
 
 #imputing mean values by group
-airbnb$price[is.na(airbnb$price)] = ave(airbnb$price, airbnb$room_type, 
+airbnb$price_calc[is.na(airbnb$price_calc)] = ave(airbnb$price_calc, airbnb$room_type, 
                                         FUN = function(x) 
-                                          mean(x, na.rm = TRUE))[c(which(is.na(airbnb$price)))]
+                                          mean(x, na.rm = TRUE))[c(which(is.na(airbnb$price_calc)))]
 
 #calculating average room price
-mean_room_type <- aggregate(list(average_price = airbnb$price), 
+mean_room_type <- aggregate(list(average_price = airbnb$price_calc), 
                             list(room_type = airbnb$room_type), mean)
 mean_room_type$Percent <- prop.table(mean_room_type$average_price) * 100
 
@@ -208,7 +216,7 @@ d
 
 #  ****** Most Cheapest / Expensive Neighborhoods ******
 
-top_10_neighbourhood <- aggregate(list(airbnb$price), list(airbnb$neighbourhood_cleansed), mean)
+top_10_neighbourhood <- aggregate(list(airbnb$price_calc), list(airbnb$neighbourhood_cleansed), mean)
 colnames(top_10_neighbourhood) <- c("neighbourhood", "Average_price_per_neighborhood")
 top_10_neighbourhood <- top_10_neighbourhood[order(top_10_neighbourhood$Average_price_per_neighborhood),]
 
@@ -239,8 +247,37 @@ e <- ggplot(data = top_cheapest,
   ylab("") +
   tema2
 
-e + coord_polar(clip = "off",direction = 1)
+e + coord_polar(clip = "off",direction = 1)+
+  scale_fill_manual(values = getPalette(colourCount))+
+  aes(x=reorder(neighbourhood,Average_price_per_neighborhood))+
+  xlab(" Neighbourhood ") +
+  ylab("") +
+  theme(axis.text.x = element_text(angle=20))
 
+
+f <- ggplot(data = top_expensive,
+            mapping = aes(x = neighbourhood, 
+                          y = Average_price_per_neighborhood)) +
+  geom_bar(stat = "identity",
+           mapping = aes(fill = neighbourhood),
+           alpha = .8, size = 0) +
+  geom_label(mapping = aes(label = round(Average_price_per_neighborhood, 1)),
+             size = 2.5, fill = "#F5FFFA", fontface = "bold") +
+  theme_minimal() +
+  ggtitle("Top 10 expensive neighborhoods") +
+  tema2
+
+
+
+f  + coord_polar(clip = "off",direction = -1)+
+  scale_fill_manual(values = getPalette(colourCount))+
+  aes(x=reorder(neighbourhood,Average_price_per_neighborhood))+
+  xlab(" Neighbourhood ") +
+  ylab("") +
+  theme(axis.text.x = element_text(angle=12))
+
+# removing column created for data analysis
+airbnb = subset(airbnb, select = -c(price_calc))
 
 # ********************************* DATA CLEANING FOR PREDICTION **********************************
 
@@ -293,7 +330,7 @@ for (i in 1:90) { # remove white space that R introduced
     names(summary)[i] = substring(names(summary)[i],2)
   }
 }
-keepT90 = names(summary)[1:90] # top 90 most frequent ammenities
+keepT90 = names(summary)[1:90] # top 90 most frequent amenities
 keepT90 = keepT90[-c(29,32,38,74)] # remove duplicate shampoo washer Hot water heating
 
 # keep only top 90 amenities and discard the rest
@@ -302,14 +339,12 @@ for (i in 1:length(clean_amenities)) {
   clean_amenities[[i]] = clean_amenities[[i]][temp_index]
 }
 
-# Another way to split amentites cols :- 
+# Another way to split amenites cols :- 
 
 # Extract amenities from airbnb data set
 airbnb_amenities = airbnb [,c("amenities")]
 
 # Generate a long list of all strings below this cols; Run slowly-around 3 minutes
-install.packages("BBmisc")
-library(BBmisc)
 total_amenities = c()
 for ( i in 1: dim(airbnb_amenities)[1]){
   a = airbnb_amenities[i,]
@@ -393,9 +428,18 @@ airbnb = airbnb[!is.na(airbnb$host_is_superhost) &
 # ********************************* TRAINING AND TESTING SPLIT **********************************
 
 set.seed(1)
+
+# Removing columns with more than 32 factors (Decision Tree Requirement)
+airbnb = subset(airbnb, select = -c(host_location,host_neighbourhood, 
+                                    neighbourhood_cleansed, property_type))
+
 test_set_indices = sample(1:nrow(airbnb),round(0.3*nrow(airbnb)),replace = FALSE)
 training_set = airbnb[-test_set_indices,]
 test_set = airbnb[test_set_indices,]
+
+# Removing spaces from column names
+names(training_set) <- gsub(" ", "_", names(training_set))
+names(test_set) <- gsub(" ", "_", names(test_set))
 
 # IMPUTING VALUES ON TRAINING SET :-
 
@@ -518,8 +562,15 @@ plot(poly_reg_model)
 
 # DECISION TREE REGRESSION
 
-tree_location <- tree (review_scores_location~. , data=training_set)
-summary(tree_location )
+tree_location <- tree(review_scores_location ~ . -review_scores_rating                       
+                      -review_scores_accuracy                    
+                      -review_scores_cleanliness      
+                      -review_scores_checkin                      
+                      -review_scores_communication             
+                      -review_scores_location  
+                      -review_scores_value
+                      , data=training_set)
+summary(tree_location)
 plot (tree_location)
 text (tree_location , pretty = 0)
 
@@ -529,7 +580,7 @@ tree_reg = train(review_scores_location ~ latitude + longitude,
                  data = training_set, method = 'rpart',
                  trControl = trainControl(method = 'repeatedcv' , number = 10, repeats = 3),
                  tuneGrid = cp.grid )
-#tree_reg 
+tree_reg 
 best.tree = tree_reg$finalModel
 
 prp(best.tree) # the best cp is 0.001                
@@ -691,17 +742,6 @@ training_set %>% ggplot(aes(y=review_scores_checkin, x=factor(host_response_time
 training_set %>% ggplot(aes(y=review_scores_checkin, x=factor(host_is_superhost)))+ geom_boxplot() 
 training_set %>% ggplot(aes(y=review_scores_checkin, x=factor(instant_bookable)))+ geom_boxplot() 
 
-install.packages("polywog")
-install.packages("rpart.plot")
-library(corrplot)
-library(caret)
-library(data.table)
-library(ggplot2)
-library(ModelMetrics)
-library(polywog)
-library (tree)
-library(rpart.plot)
-library(e1071)
 ##linear regression
 # convert them factor into numeric 
 training_set1 = training_set %>% mutate_if(sapply(training_set, is.factor), as.numeric)
@@ -721,7 +761,6 @@ rmse(training_set1$review_scores_checkin,predict(lm_reg,training_set1[,-c("revie
 rmse(test_set1$review_scores_checkin,predict(lm_reg,test_set1[,-c("review_scores_checkin"),drop=FALSE]))
 
 ## Decision tree regression
-library(tree)
 library(rpart.plot)
 tree_checkin<- tree (review_scores_checkin~. , data=training_set)
 summary(tree_checkin )
@@ -748,8 +787,7 @@ mean ((predict (best.tree , newdata =test_set1) - test_set1$review_scores_checki
 #log transform check in score perform still not good
 
 ## SVM Regression: choose radial kernel
-library(caret)
-# fit in radial kernal 
+# fit in radial kernel 
 # eps-regression: no control of number of support vectors
 svmfit1 = svm(review_scores_checkin~. ,data=training_set1, kernel="radial" ,scale=TRUE) # needs around 5 minutes to run
 summary(svmfit1) 
