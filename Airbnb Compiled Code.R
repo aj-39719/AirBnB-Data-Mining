@@ -1366,6 +1366,56 @@ RMSE(pred_knn_cleanliness,test_set_cleanliness$review_scores_cleanliness)
 # Test RMSE = 0.5509493 , Training RMSE = 0.5740209 (lowest for k = 59)
 
 
+## RANDOM FOREST REGRESSION
+
+set.seed(1)
+rf_exclude_from_train = c("review_scores_checkin","review_scores_rating","review_scores_accuracy","review_scores_communication","review_scores_location","review_scores_value")
+rf_clean = randomForest(review_scores_cleanliness ~. , data = training_set_rf |> select(-rf_exclude_from_train), sampsize=5000)
+
+
+rf_clean
+plot(rf_clean$mse,xlab = "tree count", ylab = "mse")
+
+test_predictions_rf_clean = predict(rf_clean,test_set_rf[,-c("review_scores_cleanliness")])
+test_predictions_rf_clean = unname(test_predictions_rf_clean)
+
+# train rmse = 0.4883769
+training_predictions_rf_clean = predict(rf_clean,training_set_rf[,-c("review_scores_cleanliness")])
+training_predictions_rf_clean = unname(training_predictions_rf_clean)
+rmse(training_set_rf$review_scores_cleanliness,training_predictions_rf_clean)
+
+# test rmse = 0.5310228
+rmse(test_set_rf$review_scores_cleanliness,test_predictions_rf_clean)
+
+## BAGGING MODEL
+rf_bagging_clean = randomForest(review_scores_cleanliness ~. , data = training_set_rf |> select(-rf_exclude_from_train), sampsize=5000, mtry=(ncol(training_set_rf)-1)) 
+rf_bagging_clean
+test_predictions_bag_clean = predict(rf_bagging_clean,test_set_rf[,-c("review_scores_cleanliness")])
+test_predictions_bag_clean = unname(test_predictions_bag_clean)
+# test rmse = 0.5339579
+rmse(test_set_rf$review_scores_cleanliness,test_predictions_bag_clean)
+
+training_predictions_bag_clean = predict(rf_bagging_clean,training_set_rf[,-c("review_scores_cleanliness")])
+training_predictions_bag_clean = unname(training_predictions_bag_clean)
+# training rmse = 0.4861475
+rmse(training_set_rf$review_scores_cleanliness,training_predictions_bag_clean)
+
+## Boosting Model 
+set.seed(1)
+
+#train fraction for validation
+boost_clean = gbm(review_scores_cleanliness ~. , data = training_set_rf |> select(-rf_exclude_from_train),train.fraction=0.8, distribution="gaussian", n.trees=180, interaction.depth=3)
+yhat_boost_clean = predict(boost_clean, test_set_rf[,-c("review_scores_cleanliness")], n.trees=180)
+# test rmse = 0.5407948
+rmse(test_set_rf$review_scores_cleanliness,yhat_boost_clean)
+plot(boost_clean$train.error,xlab = "tree count", ylab = "loss")
+plot(boost_clean$valid.error,xlab = "tree count", ylab = "validation loss")
+
+training_yhat_boost_clean = predict(boost_clean, training_set_rf[,-c("review_scores_cleanliness")], n.trees=180)
+# training rmse = 0.532681
+rmse(training_set_rf$review_scores_cleanliness,training_yhat_boost_clean)
+                                        
+
 
 # ********************************** PREDICTING VALUE REVIEWS ********************************************
 
@@ -1472,4 +1522,55 @@ RMSE(pred_knn_value,test_set_value$review_scores_value)
 # Test RMSE = 0.4914534 , Training RMSE = 0.5063392  (lowest for k = 59)
 
 
+## RANDOM FOREST REGRESSION
+
+set.seed(1)
+rf_exclude_from_train = c("review_scores_checkin","review_scores_rating","review_scores_accuracy","review_scores_communication","review_scores_location","review_scores_cleanliness")
+rf_val = randomForest(review_scores_value ~. , data = training_set_rf |> select(-rf_exclude_from_train), sampsize=5000)
+
+
+rf_val
+plot(rf_val$mse,xlab = "tree count", ylab = "mse")
+
+test_predictions_rf_val = predict(rf_val,test_set_rf[,-c("review_scores_value")])
+test_predictions_rf_val = unname(test_predictions_rf_val)
+
+# train rmse = 0.4338409
+training_predictions_rf_val = predict(rf_val,training_set_rf[,-c("review_scores_value")])
+training_predictions_rf_val = unname(training_predictions_rf_val)
+rmse(training_set_rf$review_scores_value,training_predictions_rf_val)
+
+# test rmse = 0.4777971
+rmse(test_set_rf$review_scores_value,test_predictions_rf_val)
+
+## BAGGING MODEL
+rf_bagging_val = randomForest(review_scores_value ~. , data = training_set_rf |> select(-rf_exclude_from_train), sampsize=5000, mtry=(ncol(training_set_rf)-1)) 
+rf_bagging_val
+test_predictions_bag_val = predict(rf_bagging_val,test_set_rf[,-c("review_scores_value")])
+test_predictions_bag_val = unname(test_predictions_bag_val)
+# test rmse = 0.4799422
+rmse(test_set_rf$review_scores_value,test_predictions_bag_val)
+
+training_predictions_bag_val = predict(rf_bagging_val,training_set_rf[,-c("review_scores_value")])
+training_predictions_bag_val = unname(training_predictions_bag_val)
+# training rmse = 0.4324821
+rmse(training_set_rf$review_scores_value,training_predictions_bag_val)
+
+## Boosting Model 
+set.seed(1)
+
+#train fraction for validation
+boost_val = gbm(review_scores_value ~. , data = training_set_rf |> select(-rf_exclude_from_train),train.fraction=0.8, distribution="gaussian", n.trees=230, interaction.depth=3)
+yhat_boost_val = predict(boost_val, test_set_rf[,-c("review_scores_value")], n.trees=230)
+# test rmse = 0.4818763
+rmse(test_set_rf$review_scores_value,yhat_boost_val)
+plot(boost_val$train.error,xlab = "tree count", ylab = "loss")
+plot(boost_val$valid.error,xlab = "tree count", ylab = "validation loss")
+
+training_yhat_boost_val = predict(boost_val, training_set_rf[,-c("review_scores_value")], n.trees=230)
+# training rmse = 0.4753587
+rmse(training_set_rf$review_scores_value,training_yhat_boost_val)
+                                        
+
+                                        
 # *************************************** END OF PROJECT ***************************************
