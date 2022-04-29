@@ -902,6 +902,58 @@ rmse(training_set_checkin$review_scores_checkin,predict(svmfit2,training_set_che
 rmse(test_set_checkin$review_scores_checkin,predict(svmfit2,test_set_checkin))
 
 # testing set RMSE = 0.4849525,  training set RMSE =  0.5011387
+                                        
+                                        
+## RANDOM FOREST REGRESSION
+
+set.seed(1)
+
+rf_exclude_from_train = c("review_scores_rating","review_scores_accuracy","review_scores_cleanliness","review_scores_communication","review_scores_location","review_scores_value")
+rf_check = randomForest(review_scores_checkin ~. , data = training_set_rf |> select(-rf_exclude_from_train), sampsize=5000)
+
+rf_check
+plot(rf_check$mse,xlab = "tree count", ylab = "mse")
+
+test_predictions_rf_check = predict(rf_check,test_set_rf[,-c("review_scores_checkin")])
+test_predictions_rf_check = unname(test_predictions_rf_check)
+
+# train rmse = 0.4001527
+training_predictions_rf_check = predict(rf_check,training_set_rf[,-c("review_scores_checkin")])
+training_predictions_rf_check = unname(training_predictions_rf_check)
+rmse(training_set_rf$review_scores_checkin,training_predictions_rf_check)
+
+# test rmse = 0.4376827
+rmse(test_set_rf$review_scores_checkin,test_predictions_rf_check)
+
+## BAGGING MODEL
+rf_bagging_check = randomForest(review_scores_checkin ~. , data = training_set_rf |> select(-rf_exclude_from_train), sampsize=5000, mtry=(ncol(training_set_rf)-1)) 
+rf_bagging_check
+test_predictions_bag_check = predict(rf_bagging_check,test_set_rf[,-c("review_scores_checkin")])
+test_predictions_bag_check = unname(test_predictions_bag_check)
+# test rmse = 0.4405681
+rmse(test_set_rf$review_scores_checkin,test_predictions_bag_check)
+
+training_predictions_bag_check = predict(rf_bagging_check,training_set_rf[,-c("review_scores_checkin")])
+training_predictions_bag_check = unname(training_predictions_bag_check)
+# training rmse = 0.4004077
+rmse(training_set_rf$review_scores_checkin,training_predictions_bag_check)
+
+## Boosting Model 
+set.seed(1)
+
+#train fraction for validation
+boost_check = gbm(review_scores_checkin ~. , data = training_set_rf |> select(-rf_exclude_from_train),train.fraction=0.8, distribution="gaussian", n.trees=100, interaction.depth=3)
+yhat_boost_check = predict(boost_check, test_set_rf[,-c("review_scores_checkin")], n.trees=100)
+# test rmse = 0.4441462 100 3
+rmse(test_set_rf$review_scores_checkin,yhat_boost_check)
+plot(boost_check$train.error,xlab = "tree count", ylab = "loss")
+plot(boost_check$valid.error,xlab = "tree count", ylab = "validation loss")
+
+training_yhat_boost_check = predict(boost_check, training_set_rf[,-c("review_scores_checkin")], n.trees=100)
+# training rmse = 0.4426708
+rmse(training_set_rf$review_scores_checkin,training_yhat_boost_check)
+                                        
+
 
 # ********************************** PREDICTING RATING REVIEWS ****************************************
 
