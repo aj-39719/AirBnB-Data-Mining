@@ -873,17 +873,18 @@ knn_reg_rating = train(review_scores_rating ~ host_is_superhost + calculated_hos
                         trControl = trainControl(method = 'repeatedcv' , number = 10, repeats = 3),
                         tuneGrid = tuneGrid)
 
-knn_results_checkin = knn_reg_checkin$results
-knn_results_checkin
-plot(knn_reg_checkin)
-varImp(knn_reg_checkin) 
-# Varibles of importance -
-# host_is_superhost  100.000
-# instant_bookable    30.351
-# price                8.057
-# host_response_time   0.000
+knn_results_rating= knn_reg_rating$results
+knn_results_rating
+plot(knn_reg_rating)
+varImp(knn_reg_rating) 
+# Variables of importance -
+# host_is_superhost              100.000
+# counts_amenities                53.404
+# availability_90                  8.962
+# calculated_host_listings_count   6.485
+# number_of_reviews                0.000
 
 
-pred_knn_checkin = predict(knn_reg_checkin, newdata = test_set_checkin)
-RMSE(pred_knn_checkin,test_set_checkin$review_scores_checkin)
-# Test RMSE = 0.4504275 , Training RMSE = 0.4700467 (lowest for k = 59)
+pred_knn_rating = predict(knn_reg_rating, newdata = test_set_rating)
+RMSE(pred_knn_rating,test_set_rating$review_scores_rating)
+# Test RMSE = 0.4885923 , Training RMSE = 0.5050278 (lowest for k = 59)
